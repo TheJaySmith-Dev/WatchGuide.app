@@ -6,7 +6,7 @@ import { ChevronRight, ChevronLeft } from 'lucide-react';
 interface ContentRowProps {
   title: string;
   items: MediaItem[];
-  isPoster?: boolean; // If true, vertical poster. If false, horizontal backdrop card.
+  isPoster?: boolean;
   onItemClick: (item: MediaItem) => void;
 }
 
@@ -21,11 +21,13 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
     }
   };
 
-  if (!items || items.length === 0) return null;
+  // Safe check
+  if (!items || !Array.isArray(items) || items.length === 0) {
+      return null;
+  }
 
   return (
     <div className="py-2 space-y-4 group/row">
-      {/* Header title aligned with content start */}
       <div className="flex items-center justify-between px-6 md:pl-40 md:pr-12">
         <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight">{title}</h2>
         <div className="flex gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
@@ -34,21 +36,23 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
         </div>
       </div>
 
-      {/* Scroll container bleeds to edges on desktop (px-0) */}
       <div 
         ref={rowRef}
         className="flex gap-4 overflow-x-auto px-6 md:px-0 hide-scrollbar pb-4 snap-x snap-mandatory"
       >
-        {items.map((item, index) => (
+        {items.map((item, index) => {
+          // Explicitly construct className to avoid template literal issues
+          let className = "flex-none relative cursor-pointer group transition-all duration-300 hover:scale-105 hover:z-10 snap-center ";
+          className += isPoster ? "w-[140px] md:w-[200px] " : "w-[260px] md:w-[350px] ";
+          
+          if (index === 0) className += "md:ml-40 ";
+          if (index === items.length - 1) className += "md:mr-12 ";
+
+          return (
             <div
               key={item.id}
               onClick={() => onItemClick(item)}
-              className={`
-                flex-none relative cursor-pointer group transition-all duration-300 hover:scale-105 hover:z-10 snap-center 
-                ${isPoster ? 'w-[140px] md:w-[200px]' : 'w-[260px] md:w-[350px]'}
-                ${index === 0 ? 'md:ml-40' : ''}
-                ${index === items.length - 1 ? 'md:mr-12' : ''}
-              `}
+              className={className.trim()}
             >
               <div className={`relative overflow-hidden rounded-lg ${isPoster ? 'aspect-[2/3]' : 'aspect-video'}`}>
                   <img
@@ -59,7 +63,6 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
                   
-                  {/* Fallback Title Overlay if image fails or just as style */}
                   <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end">
                       <h3 className="text-sm font-bold text-white line-clamp-2">{item.title || item.name}</h3>
                       {item.vote_average && (
@@ -68,7 +71,8 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
                   </div>
               </div>
             </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

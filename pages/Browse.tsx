@@ -3,6 +3,7 @@ import { getTrending, getMovies, getTVShows } from '../services/api';
 import { MediaItem } from '../types';
 import HeroCarousel from '../components/HeroCarousel';
 import ContentRow from '../components/ContentRow';
+import { AlertCircle } from 'lucide-react';
 
 interface BrowseProps {
   onItemClick: (item: MediaItem) => void;
@@ -14,6 +15,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const [popularShows, setPopularShows] = useState<MediaItem[]>([]);
   const [topRatedMovies, setTopRatedMovies] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -24,12 +26,19 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
           getTVShows('popular'),
           getMovies('top_rated'),
         ]);
-        setTrending(trend.slice(0, 10)); // Top 10 for Hero
-        setNowPlayingMovies(nowPlay);
-        setPopularShows(popShows);
-        setTopRatedMovies(topRated);
+        
+        // If everything is empty, we likely have an API issue
+        if (trend.length === 0 && nowPlay.length === 0) {
+            setError(true);
+        } else {
+            setTrending(trend.slice(0, 10));
+            setNowPlayingMovies(nowPlay);
+            setPopularShows(popShows);
+            setTopRatedMovies(topRated);
+        }
       } catch (e) {
         console.error("Failed to load browse data", e);
+        setError(true);
       } finally {
         setLoading(false);
       }
@@ -43,6 +52,24 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
         <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  if (error) {
+      return (
+          <div className="min-h-screen bg-[#050505] flex flex-col items-center justify-center text-white p-6 text-center">
+              <AlertCircle size={48} className="text-red-500 mb-4" />
+              <h1 className="text-2xl font-bold mb-2">Unable to load content</h1>
+              <p className="text-gray-400 max-w-md">
+                  We're having trouble connecting to the movie database. Please check your internet connection or try again later.
+              </p>
+              <button 
+                onClick={() => window.location.reload()}
+                className="mt-6 px-6 py-2 bg-indigo-600 rounded-full font-medium hover:bg-indigo-500 transition-colors"
+              >
+                  Retry
+              </button>
+          </div>
+      );
   }
 
   return (
