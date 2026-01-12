@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Sparkles, Menu } from 'lucide-react';
+import { Home, Search, Menu } from 'lucide-react';
 
 interface TabBarProps {
   activeTab: string;
@@ -10,7 +10,6 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'browse', label: 'Browse', icon: Home },
     { id: 'search', label: 'Search', icon: Search },
-    { id: 'ai-guide', label: 'AI Guide', icon: Sparkles },
     { id: 'more', label: 'More', icon: Menu },
   ];
 

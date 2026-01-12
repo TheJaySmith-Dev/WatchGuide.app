@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import TabBar from './components/TabBar';
 import Browse from './pages/Browse';
 import Search from './pages/Search';
-import AIGuide from './pages/AIGuide';
 import More from './pages/More';
 import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
@@ -50,8 +49,6 @@ const App: React.FC = () => {
                 handleMediaClick(item);
             }
         }} />;
-      case 'ai-guide':
-        return <AIGuide onItemClick={handleMediaClick} />;
       case 'more':
         return (
             <More 
