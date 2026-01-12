@@ -25,13 +25,19 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
   useEffect(() => {
     if (activeItem) {
       setLogoUrl(null); // Reset logo while fetching
-      // Try to get a high quality logo
       getFanArtLogo(activeItem.media_type as 'movie' | 'tv' || 'movie', activeItem.id)
         .then(setLogoUrl);
     }
   }, [activeItem]);
 
-  if (!activeItem) return <div className="h-[60vh] md:h-[80vh] bg-slate-900 animate-pulse" />;
+  // If no items, show a skeleton that maintains layout
+  if (!activeItem) {
+      return (
+          <div className="relative h-[65vh] md:h-[85vh] w-full bg-[#0a0a0a] overflow-hidden">
+             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-[#111] to-[#050505]" />
+          </div>
+      );
+  }
 
   return (
     <div 

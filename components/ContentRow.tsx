@@ -21,6 +21,8 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
     }
   };
 
+  if (!items || items.length === 0) return null;
+
   return (
     <div className="py-2 space-y-4 group/row">
       {/* Header title aligned with content start */}
@@ -37,16 +39,16 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
         ref={rowRef}
         className="flex gap-4 overflow-x-auto px-6 md:px-0 hide-scrollbar pb-4 snap-x snap-mandatory"
       >
-        {items.map((item, index) => {
-          // Calculate spacing classes based on index
-          const spacingClass = index === 0 ? 'md:ml-40' : index === items.length - 1 ? 'md:mr-12' : '';
-          const sizeClass = isPoster ? 'w-[140px] md:w-[200px]' : 'w-[260px] md:w-[350px]';
-          
-          return (
+        {items.map((item, index) => (
             <div
               key={item.id}
               onClick={() => onItemClick(item)}
-              className={`flex-none relative cursor-pointer group transition-all duration-300 hover:scale-105 hover:z-10 snap-center ${sizeClass} ${spacingClass}`}
+              className={`
+                flex-none relative cursor-pointer group transition-all duration-300 hover:scale-105 hover:z-10 snap-center 
+                ${isPoster ? 'w-[140px] md:w-[200px]' : 'w-[260px] md:w-[350px]'}
+                ${index === 0 ? 'md:ml-40' : ''}
+                ${index === items.length - 1 ? 'md:mr-12' : ''}
+              `}
             >
               <div className={`relative overflow-hidden rounded-lg ${isPoster ? 'aspect-[2/3]' : 'aspect-video'}`}>
                   <img
@@ -66,8 +68,7 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
                   </div>
               </div>
             </div>
-          );
-        })}
+        ))}
       </div>
     </div>
   );
