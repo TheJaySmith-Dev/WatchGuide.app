@@ -37,6 +37,11 @@
       };
     </script>
     <style>
+      html, body, #root {
+        height: 100%;
+        margin: 0;
+        padding: 0;
+      }
       body {
         background-color: #050505;
         color: #ffffff;
@@ -65,18 +70,19 @@
         scrollbar-width: none;
       }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
-    "react": "https://esm.sh/react@18.3.1",
-    "react/": "https://esm.sh/react@18.3.1/",
-    "react-dom": "https://esm.sh/react-dom@18.3.1",
-    "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-    "lucide-react": "https://esm.sh/lucide-react@0.292.0?external=react"
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://esm.sh/react@18.2.0/",
+    "react-dom": "https://esm.sh/react-dom@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.344.0?deps=react@18.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
     <div id="root"></div>
   </body>
