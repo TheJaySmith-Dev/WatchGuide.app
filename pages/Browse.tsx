@@ -20,6 +20,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        // Fetch in parallel
         const [trend, nowPlay, popShows, topRated] = await Promise.all([
           getTrending(),
           getMovies('now_playing'),
@@ -27,11 +28,11 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
           getMovies('top_rated'),
         ]);
         
-        // If everything is empty, we likely have an API issue
-        if (trend.length === 0 && nowPlay.length === 0) {
+        // Ensure we have some data
+        if (trend.length === 0 && nowPlay.length === 0 && popShows.length === 0) {
             setError(true);
         } else {
-            setTrending(trend.slice(0, 10));
+            setTrending(trend);
             setNowPlayingMovies(nowPlay);
             setPopularShows(popShows);
             setTopRatedMovies(topRated);
@@ -60,7 +61,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
               <AlertCircle size={48} className="text-red-500 mb-4" />
               <h1 className="text-2xl font-bold mb-2">Unable to load content</h1>
               <p className="text-gray-400 max-w-md">
-                  We're having trouble connecting to the movie database. Please check your internet connection or try again later.
+                  We're having trouble connecting. Please check your internet connection.
               </p>
               <button 
                 onClick={() => window.location.reload()}
@@ -72,9 +73,12 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
       );
   }
 
+  // Determine Hero Items: Use Trending, fallback to Now Playing, then Popular Shows
+  const heroItems = trending.length > 0 ? trending.slice(0, 10) : (nowPlayingMovies.length > 0 ? nowPlayingMovies : popularShows);
+
   return (
     <div className="pb-24 md:pb-0">
-      <HeroCarousel items={trending} onItemClick={onItemClick} />
+      <HeroCarousel items={heroItems} onItemClick={onItemClick} />
       
       <div className="-mt-16 relative z-30 space-y-8 pb-10">
         <ContentRow title="New Movies" items={nowPlayingMovies} onItemClick={onItemClick} isPoster={true} />

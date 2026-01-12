@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl, getFanArtLogo } from '../services/api';
-import { Play, Info } from 'lucide-react';
 
 interface HeroCarouselProps {
   items: MediaItem[];
@@ -13,28 +12,28 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    if (items.length === 0) return;
+    if (!items || items.length === 0) return;
     const interval = setInterval(() => {
       setActiveIndex((prev) => (prev + 1) % items.length);
     }, 8000);
     return () => clearInterval(interval);
-  }, [items.length]);
+  }, [items]);
 
-  const activeItem = items[activeIndex];
+  const activeItem = items && items.length > 0 ? items[activeIndex] : null;
 
   useEffect(() => {
     if (activeItem) {
-      setLogoUrl(null); // Reset logo while fetching
+      setLogoUrl(null); 
       getFanArtLogo(activeItem.media_type as 'movie' | 'tv' || 'movie', activeItem.id)
         .then(setLogoUrl);
     }
   }, [activeItem]);
 
-  // If no items, show a skeleton that maintains layout
+  // If no items are passed at all, show a graceful placeholder instead of a skeleton
   if (!activeItem) {
       return (
-          <div className="relative h-[65vh] md:h-[85vh] w-full bg-[#0a0a0a] overflow-hidden">
-             <div className="absolute inset-0 animate-pulse bg-gradient-to-r from-[#111] to-[#050505]" />
+          <div className="relative h-[65vh] md:h-[85vh] w-full bg-[#0a0a0a] flex items-center justify-center">
+             <div className="text-gray-600 font-medium">No featured content available</div>
           </div>
       );
   }
@@ -62,8 +61,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
         </div>
       ))}
 
-      {/* Content Layer - Theater Curtain Style */}
-      {/* Adjusted padding to md:pl-40 to clear the floating sidebar */}
+      {/* Content Layer */}
       <div className="absolute inset-0 z-20 flex flex-col justify-end pb-20 px-6 md:pl-40 md:pr-24 md:pb-32 md:justify-center md:items-start">
         <div className={`transition-all duration-700 transform ${
             logoUrl ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'
