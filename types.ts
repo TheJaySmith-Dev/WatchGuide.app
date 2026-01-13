@@ -128,8 +128,3 @@ export interface ChatMessage {
   content: string;
   timestamp?: number;
 }
-export interface ChatMessage {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  timestamp?: number;
-}
