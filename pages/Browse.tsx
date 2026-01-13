@@ -74,30 +74,66 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const handleLoadAIRecommendations = async () => {
     setAiLoading(true);
     try {
-      const liked = storageService.getList('liked').map(i => i.title || i.name).join(', ');
-      const watched = storageService.getList('watched').map(i => i.title || i.name).join(', ');
+      const likedItems = storageService.getList('liked');
+      const watchedItems = storageService.getList('watched');
 
-      const prompt = `Based on my library, recommend 10 movies or TV shows I haven't seen yet. 
-        Liked: ${liked}
-        Watched: ${watched}
-        Return ONLY a JSON array of strings (titles), e.g. ["Title 1", "Title 2"]. No other text.`;
+      if (likedItems.length === 0 && watchedItems.length === 0) {
+        alert("Add some movies to your Liked or Watched lists first so the AI knows what you enjoy!");
+        setAiLoading(false);
+        return;
+      }
+
+      const liked = likedItems.map(i => i.title || i.name).join(', ');
+      const watched = watchedItems.map(i => i.title || i.name).join(', ');
+
+      const prompt = `Act as a movie discovery expert. I want 10 personalized recommendations (movies/TV) based on my tastes.
+        
+        MY LIBRARY:
+        - Liked: ${liked}
+        - Watched: ${watched}
+        
+        REQUIREMENTS:
+        - Recommend titles I HAVEN'T watched/liked yet.
+        - Mix it up: some popular hits and some hidden gems.
+        - Provide ONLY a JSON array of strings (titles).
+        - Format: ["Title 1", "Title 2", ...]
+        - NO text before or after the JSON.`;
 
       const response = await sendMessageToPoe([{ role: 'user', content: prompt }]);
-      const titles = JSON.parse(response.replace(/```json|```/g, '').trim());
+
+      // Robust JSON extraction
+      let jsonStr = response;
+      const jsonMatch = response.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        jsonStr = jsonMatch[0];
+      }
+
+      const titles = JSON.parse(jsonStr.trim());
+
+      if (!Array.isArray(titles)) throw new Error("AI did not return an array");
 
       const tmdbResults = await Promise.all(
-        titles.map(async (title: string) => {
-          const results = await searchMulti(title);
-          return results[0];
+        titles.slice(0, 10).map(async (title: string) => {
+          try {
+            const results = await searchMulti(title);
+            return results[0];
+          } catch {
+            return null;
+          }
         })
       );
 
       const validResults = tmdbResults.filter(Boolean) as MediaItem[];
+
+      if (validResults.length === 0) {
+        throw new Error("No valid titles found on TMDB");
+      }
+
       setAiRecommendations(validResults);
       storageService.setAIRecommendations(validResults);
     } catch (e) {
-      console.error("AI Recommendation failed", e);
-      alert("Failed to load AI recommendations. Please try again.");
+      console.error("AI Recommendation failed:", e);
+      alert("AI is having a moment. Please try again or add more likes to your profile!");
     } finally {
       setAiLoading(false);
     }
