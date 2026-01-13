@@ -25,27 +25,67 @@ class SimklService {
     }
 
     async exchangeCodeForToken(code: string): Promise<string> {
+        console.log('Simkl Auth: Starting exchange...', {
+            client_id: SIMKL_CLIENT_ID?.substring(0, 5) + '...',
+            redirect_uri: SIMKL_REDIRECT_URI,
+            code: code.substring(0, 5) + '...'
+        });
+
         try {
+            // Some Simkl docs suggest JSON, others form-data. Let's try JSON first as it's what we had.
+            const body = {
+                grant_type: 'authorization_code',
+                code,
+                client_id: SIMKL_CLIENT_ID,
+                client_secret: SIMKL_CLIENT_SECRET,
+                redirect_uri: SIMKL_REDIRECT_URI,
+            };
+
             const response = await fetch(`${API_BASE_URL}/oauth/token`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    grant_type: 'authorization_code',
-                    code,
-                    client_id: SIMKL_CLIENT_ID,
-                    client_secret: SIMKL_CLIENT_SECRET,
-                    redirect_uri: SIMKL_REDIRECT_URI,
-                }),
+                body: JSON.stringify(body),
             });
 
-            if (!response.ok) throw new Error('Failed to exchange code');
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Simkl Auth JSON failed:', errorText);
 
-            const data = await response.json();
-            this.accessToken = data.access_token;
-            localStorage.setItem('simkl_access_token', this.accessToken!);
-            return this.accessToken!;
+                // Fallback to x-www-form-urlencoded
+                console.log('Simkl Auth: Retrying with x-www-form-urlencoded...');
+                const formBody = new URLSearchParams();
+                Object.entries(body).forEach(([key, value]) => {
+                    if (value) formBody.append(key, value);
+                });
+
+                const fallbackResponse = await fetch(`${API_BASE_URL}/oauth/token`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                    },
+                    body: formBody.toString(),
+                });
+
+                if (!fallbackResponse.ok) {
+                    const fallbackError = await fallbackResponse.text();
+                    console.error('Simkl Auth Fallback failed:', fallbackError);
+                    throw new Error(`Auth failed: ${fallbackError}`);
+                }
+
+                const data = await fallbackResponse.json();
+                this.accessToken = data.access_token;
+            } else {
+                const data = await response.json();
+                this.accessToken = data.access_token;
+            }
+
+            if (this.accessToken) {
+                localStorage.setItem('simkl_access_token', this.accessToken);
+                return this.accessToken;
+            }
+            throw new Error('No access token received');
         } catch (error) {
             console.error('Simkl Auth Error:', error);
             throw error;
