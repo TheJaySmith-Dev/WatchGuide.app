@@ -122,3 +122,19 @@ export interface AIChatMessage {
   text: string;
   recommendations?: MediaItem[];
 }
+
+export interface ChatMessage {
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp?: number;
+}
+// Simkl Types
+export interface SimklUser {
+  name: string;
+  avatar: string;
+}
+
+export interface SimklList {
+  movies: any[];
+  shows: any[];
+}
