@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
-import { Play, Heart, Check, Clock, ListPlus } from 'lucide-react';
+import { Play, Heart, Check, Clock, ListPlus, Copy } from 'lucide-react';
 import { storageService, ListType } from '../services/storage';
 
 interface MyListProps {
@@ -26,22 +26,22 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                     <h1 className="text-4xl font-black text-white">My Library</h1>
                     <p className="text-gray-400 mt-2">Privacy-first local storage</p>
                 </div>
-                <button
-                    onClick={() => {
-                        const items = storageService.getList(activeList);
-                        if (items.length === 0) return alert('List is empty');
+                {currentList.length > 0 && (
+                    <button
+                        onClick={() => {
+                            const items = storageService.getList(activeList);
+                            const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
+                            const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
 
-                        const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
-                        const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
-
-                        navigator.clipboard.writeText(header + listText);
-                        alert('List copied to clipboard as text!');
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
-                >
-                    <Copy size={16} />
-                    <span>Copy List</span>
-                </button>
+                            navigator.clipboard.writeText(header + listText);
+                            alert('List copied to clipboard as text!');
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
+                    >
+                        <Copy size={16} />
+                        <span>Copy List</span>
+                    </button>
+                )}
             </header>
 
             {/* List Selector Tabs */}
