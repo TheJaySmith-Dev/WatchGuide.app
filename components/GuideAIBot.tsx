@@ -131,7 +131,7 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
 
             const responseContent = await sendMessageToPoe(
                 [...messages, userMessage],
-                contextString + likedContext + "\n\nUse the user's Liked items to personalize recommendations. If they ask to add to list, remind them they can use the buttons in the detail view."
+                contextString + likedContext + "\n\nCRITICAL: The Simkl integration has been COMPLETELY REMOVED. THE APP NOW USES PRIVACY-FIRST LOCAL STORAGE ONLY. Do NOT mention Simkl, accounts, or logging in. If the user asks to add to a list, tell them to use the '+' (Want to Watch), 'Check' (Watched), or 'Heart' (Like) buttons in the detail view. Use the user's Liked items to personalize recommendations based on their local preferences."
             );
 
             const displayContent = responseContent.replace(/\[ACTION: [A-Z_]+\]/g, '').trim();

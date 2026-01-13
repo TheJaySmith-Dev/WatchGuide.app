@@ -85,6 +85,19 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                         </div>
                     </div>
                 </div>
+
+                <button
+                    onClick={() => {
+                        if (confirm('Are you sure you want to delete all local watchlists? This cannot be undone.')) {
+                            localStorage.removeItem('watchguide_user_data');
+                            window.location.reload();
+                        }
+                    }}
+                    className="w-full flex items-center justify-between p-4 bg-rose-600/10 border border-rose-500/20 rounded-xl hover:bg-rose-600/20 transition-all text-rose-400 text-xs font-bold uppercase tracking-widest mt-4"
+                >
+                    <span>Reset All Local Data</span>
+                    <X size={14} />
+                </button>
             </div>
 
             {/* Settings Section */}

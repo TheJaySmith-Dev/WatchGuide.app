@@ -9,8 +9,7 @@ import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
 import GuideAIBot from './components/GuideAIBot';
-import { MediaItem, SimklUser } from './types';
-import { simklService } from './services/simkl';
+import { MediaItem } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('browse');
@@ -19,6 +18,12 @@ const App: React.FC = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
   // Default to US, can be persisted in localStorage in a real app
   const [region, setRegion] = useState('US');
+
+  useEffect(() => {
+    // Purge residual Simkl data from legacy versions
+    localStorage.removeItem('simkl_access_token');
+    localStorage.removeItem('simkl_user');
+  }, []);
 
   const handleMediaClick = (item: MediaItem) => {
     // Reset others to simulate navigation
