@@ -6,6 +6,8 @@ export interface UserData {
     wantToWatch: MediaItem[];
     watched: MediaItem[];
     liked: MediaItem[];
+    aiRecommendations?: MediaItem[];
+    aiTimestamp?: number;
 }
 
 const STORAGE_KEY = 'watchguide_user_data';
@@ -45,6 +47,19 @@ class StorageService {
 
     isInList(type: ListType, id: number): boolean {
         return this.data[type].some(i => i.id === id);
+    }
+
+    getAIRecommendations(): { items: MediaItem[], timestamp: number } | null {
+        if (this.data.aiRecommendations && this.data.aiTimestamp) {
+            return { items: this.data.aiRecommendations, timestamp: this.data.aiTimestamp };
+        }
+        return null;
+    }
+
+    setAIRecommendations(items: MediaItem[]) {
+        this.data.aiRecommendations = items;
+        this.data.aiTimestamp = Date.now();
+        this.save();
     }
 
     exportData(): string {

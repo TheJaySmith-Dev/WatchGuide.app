@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { getTrending, getMovies, getTVShows, getRecommendations, getSimilarMedia } from '../services/api';
+import { getTrending, getMovies, getTVShows, getRecommendations, getSimilarMedia, searchMulti } from '../services/api';
 import { MediaItem } from '../types';
 import HeroCarousel from '../components/HeroCarousel';
 import ContentRow from '../components/ContentRow';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Sparkles, Loader2 } from 'lucide-react';
 import { storageService } from '../services/storage';
+import { sendMessageToPoe } from '../services/poe';
 
 interface BrowseProps {
   onItemClick: (item: MediaItem) => void;
@@ -16,8 +17,9 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const [popularShows, setPopularShows] = useState<MediaItem[]>([]);
   const [topRatedMovies, setTopRatedMovies] = useState<MediaItem[]>([]);
   const [similarItems, setSimilarItems] = useState<{ title: string; items: MediaItem[] } | null>(null);
-  const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
+  const [aiRecommendations, setAiRecommendations] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(false);
 
   useEffect(() => {
@@ -36,6 +38,12 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
         setPopularShows(popShows);
         setTopRatedMovies(topRated);
 
+        // Load cached AI recommendations
+        const cached = storageService.getAIRecommendations();
+        if (cached) {
+          setAiRecommendations(cached.items);
+        }
+
         // Personalized rows
         const likedItems = storageService.getList('liked');
         const watchedItems = storageService.getList('watched');
@@ -43,19 +51,13 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
         const referenceItem = likedItems[likedItems.length - 1] || watchedItems[watchedItems.length - 1];
 
         if (referenceItem) {
-          const [similar, recs] = await Promise.all([
-            getSimilarMedia(referenceItem.media_type as 'movie' | 'tv', referenceItem.id),
-            getRecommendations(referenceItem.media_type as 'movie' | 'tv', referenceItem.id)
-          ]);
+          const similar = await getSimilarMedia(referenceItem.media_type as 'movie' | 'tv', referenceItem.id);
 
           if (similar.length > 0) {
             setSimilarItems({
               title: `Similar to ${referenceItem.title || referenceItem.name}`,
               items: similar
             });
-          }
-          if (recs.length > 0) {
-            setRecommendations(recs);
           }
         }
 
@@ -68,6 +70,38 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
     };
     fetchData();
   }, []);
+
+  const handleLoadAIRecommendations = async () => {
+    setAiLoading(true);
+    try {
+      const liked = storageService.getList('liked').map(i => i.title || i.name).join(', ');
+      const watched = storageService.getList('watched').map(i => i.title || i.name).join(', ');
+
+      const prompt = `Based on my library, recommend 10 movies or TV shows I haven't seen yet. 
+        Liked: ${liked}
+        Watched: ${watched}
+        Return ONLY a JSON array of strings (titles), e.g. ["Title 1", "Title 2"]. No other text.`;
+
+      const response = await sendMessageToPoe([{ role: 'user', content: prompt }]);
+      const titles = JSON.parse(response.replace(/```json|```/g, '').trim());
+
+      const tmdbResults = await Promise.all(
+        titles.map(async (title: string) => {
+          const results = await searchMulti(title);
+          return results[0];
+        })
+      );
+
+      const validResults = tmdbResults.filter(Boolean) as MediaItem[];
+      setAiRecommendations(validResults);
+      storageService.setAIRecommendations(validResults);
+    } catch (e) {
+      console.error("AI Recommendation failed", e);
+      alert("Failed to load AI recommendations. Please try again.");
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -103,15 +137,38 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
       <HeroCarousel items={heroItems} onItemClick={onItemClick} />
 
       <div className="-mt-16 relative z-30 space-y-8 pb-10">
+
+        {/* AI For You Row */}
+        <div className="px-6 md:px-12">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-2">
+              <Sparkles className="text-amber-400" size={20} />
+              <h2 className="text-xl md:text-2xl font-black text-white">AI Powered For You</h2>
+            </div>
+            <button
+              onClick={handleLoadAIRecommendations}
+              disabled={aiLoading}
+              className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 text-sm font-bold"
+            >
+              {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+              {aiRecommendations.length > 0 ? 'Refresh Picks' : 'Load For You'}
+            </button>
+          </div>
+
+          {aiRecommendations.length > 0 ? (
+            <ContentRow title="" items={aiRecommendations} onItemClick={onItemClick} isPoster={true} hideTitle={true} />
+          ) : (
+            <div className="h-48 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center bg-white/5 group hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={handleLoadAIRecommendations}>
+              <p className="text-gray-500 font-medium group-hover:text-indigo-400 transition-colors">Click to generate personalized picks based on your library</p>
+            </div>
+          )}
+        </div>
+
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />
         )}
 
         <ContentRow title="New Movies" items={nowPlayingMovies} onItemClick={onItemClick} isPoster={true} />
-
-        {recommendations.length > 0 && (
-          <ContentRow title="For You" items={recommendations} onItemClick={onItemClick} isPoster={false} />
-        )}
 
         <ContentRow title="Popular TV Shows" items={popularShows} onItemClick={onItemClick} isPoster={false} />
         <ContentRow title="Critically Acclaimed Movies" items={topRatedMovies} onItemClick={onItemClick} isPoster={true} />
