@@ -1,6 +1,7 @@
 import { MediaItem, SimklUser, SimklList } from '../types';
 
-const SIMKL_CLIENT_ID = 'YOUR_SIMKL_CLIENT_ID'; // To be provided by user
+const SIMKL_CLIENT_ID = import.meta.env.VITE_SIMKL_CLIENT_ID;
+const SIMKL_CLIENT_SECRET = import.meta.env.VITE_SIMKL_CLIENT_SECRET;
 const SIMKL_REDIRECT_URI = window.location.origin;
 const API_BASE_URL = 'https://api.simkl.com';
 
@@ -30,7 +31,7 @@ class SimklService {
                     grant_type: 'authorization_code',
                     code,
                     client_id: SIMKL_CLIENT_ID,
-                    // client_secret: '...', // Usually needed for server-side, Simkl might support public clients or needs this via proxy
+                    client_secret: SIMKL_CLIENT_SECRET,
                     redirect_uri: SIMKL_REDIRECT_URI,
                 }),
             });
