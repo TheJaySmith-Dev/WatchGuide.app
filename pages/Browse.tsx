@@ -174,31 +174,33 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
 
       <div className="-mt-16 relative z-30 space-y-8 pb-10">
 
-        {/* AI For You Row */}
-        <div className="px-6 md:px-12">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Sparkles className="text-amber-400" size={20} />
-              <h2 className="text-xl md:text-2xl font-black text-white">AI Powered For You</h2>
+        {/* AI For You Row - Only shows if 3+ items in library */}
+        {(storageService.getList('liked').length + storageService.getList('watched').length) >= 3 && (
+          <div className="px-6 md:px-12">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Sparkles className="text-amber-400" size={20} />
+                <h2 className="text-xl md:text-2xl font-black text-white">AI Powered For You</h2>
+              </div>
+              <button
+                onClick={handleLoadAIRecommendations}
+                disabled={aiLoading}
+                className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 text-sm font-bold"
+              >
+                {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                {aiRecommendations.length > 0 ? 'Refresh Picks' : 'Load For You'}
+              </button>
             </div>
-            <button
-              onClick={handleLoadAIRecommendations}
-              disabled={aiLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 text-sm font-bold"
-            >
-              {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-              {aiRecommendations.length > 0 ? 'Refresh Picks' : 'Load For You'}
-            </button>
-          </div>
 
-          {aiRecommendations.length > 0 ? (
-            <ContentRow title="" items={aiRecommendations} onItemClick={onItemClick} isPoster={true} hideTitle={true} />
-          ) : (
-            <div className="h-48 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center bg-white/5 group hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={handleLoadAIRecommendations}>
-              <p className="text-gray-500 font-medium group-hover:text-indigo-400 transition-colors">Click to generate personalized picks based on your library</p>
-            </div>
-          )}
-        </div>
+            {aiRecommendations.length > 0 ? (
+              <ContentRow title="" items={aiRecommendations} onItemClick={onItemClick} isPoster={true} hideTitle={true} />
+            ) : (
+              <div className="h-48 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center bg-white/5 group hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={handleLoadAIRecommendations}>
+                <p className="text-gray-500 font-medium group-hover:text-indigo-400 transition-colors">Click to generate personalized picks based on your library</p>
+              </div>
+            )}
+          </div>
+        )}
 
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />
