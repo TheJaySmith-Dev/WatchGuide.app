@@ -105,3 +105,9 @@
     }
   }
 }
+/* Prevent auto-zoom on iOS inputs */
+input,
+select,
+textarea {
+  font-size: 16px !important;
+}
