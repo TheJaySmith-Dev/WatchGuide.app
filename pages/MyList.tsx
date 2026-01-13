@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
-import { Play, Heart, Check, Clock, ListPlus, Copy } from 'lucide-react';
+import { Play, Heart, Check, Clock, ListPlus, Copy, Share2 } from 'lucide-react';
 import { storageService, ListType } from '../services/storage';
 
 interface MyListProps {
@@ -26,22 +26,35 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                     <h1 className="text-4xl font-black text-white">My Library</h1>
                     <p className="text-gray-400 mt-2">Privacy-first local storage</p>
                 </div>
-                {currentList.length > 0 && (
+                <div className="flex gap-2">
                     <button
                         onClick={() => {
-                            const items = storageService.getList(activeList);
-                            const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
-                            const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
-
-                            navigator.clipboard.writeText(header + listText);
-                            alert('List copied to clipboard as text!');
+                            const code = storageService.exportData();
+                            navigator.clipboard.writeText(code);
+                            alert('Sync Code copied! Paste this on another device to sync your data.');
                         }}
-                        className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 hover:text-indigo-300 text-sm font-medium"
                     >
-                        <Copy size={16} />
-                        <span>Copy List</span>
+                        <Share2 size={16} />
+                        <span>Copy Sync Code</span>
                     </button>
-                )}
+                    {currentList.length > 0 && (
+                        <button
+                            onClick={() => {
+                                const items = storageService.getList(activeList);
+                                const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
+                                const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
+
+                                navigator.clipboard.writeText(header + listText);
+                                alert('List copied to clipboard as text!');
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
+                        >
+                            <Copy size={16} />
+                            <span>Copy List</span>
+                        </button>
+                    )}
+                </div>
             </header>
 
             {/* List Selector Tabs */}

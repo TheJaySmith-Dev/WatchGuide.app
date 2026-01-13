@@ -94,9 +94,24 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     return (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-hidden">
             {showSyncPrompt && (
-                <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-2">
-                    <Check size={16} />
-                    Updated locally! Remember to sync other devices in "More" tab.
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-3 ring-2 ring-white/20">
+                    <div className="flex items-center gap-2">
+                        <Check size={16} />
+                        <span>Updated!</span>
+                    </div>
+                    <div className="w-px h-4 bg-white/20" />
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            const code = storageService.exportData();
+                            navigator.clipboard.writeText(code);
+                            alert('Sync Code copied!');
+                        }}
+                        className="hover:text-indigo-200 transition-colors flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20"
+                    >
+                        <Plus size={14} className="rotate-45" />
+                        Copy Sync Code
+                    </button>
                 </div>
             )}
 
