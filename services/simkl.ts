@@ -3,20 +3,12 @@ import { MediaItem, SimklUser, SimklList } from '../types';
 const SIMKL_CLIENT_ID = (import.meta.env.VITE_SIMKL_CLIENT_ID || 'ae388b07e6b83e08f7f2da02cdaa8dacb3c58b49a86e686ad79231d4612372b9').trim();
 const SIMKL_CLIENT_SECRET = (import.meta.env.VITE_SIMKL_CLIENT_SECRET || '115a54c1d89ff52dc607a292a2b74efd6d6eb1ed9ca84ffae02bda900975bc48').trim();
 
-// Support both watchguide.app and www.watchguide.app automatically
-const currentOrigin = window.location.origin.replace(/\/$/, '');
-const envRedirectUri = (import.meta.env.VITE_SIMKL_REDIRECT_URI || '').trim().replace(/\/$/, '');
-
-// THE FIX: If envRedirectUri is provided but doesn't have a protocol, add one.
-// If not provided, use the current window origin (standard OAuth practice).
-const SIMKL_REDIRECT_URI = envRedirectUri
-    ? (envRedirectUri.startsWith('http') ? envRedirectUri : `https://${envRedirectUri}`)
-    : currentOrigin;
+// Use the exact value from .env, or the browser's current origin if empty.
+const SIMKL_REDIRECT_URI = (import.meta.env.VITE_SIMKL_REDIRECT_URI || window.location.origin).replace(/\/$/, '');
 
 console.log('--- SIMKL DEBUG START ---');
-console.log('Client ID (Length):', SIMKL_CLIENT_ID.length);
+console.log('Client ID:', SIMKL_CLIENT_ID);
 console.log('Redirect URI:', SIMKL_REDIRECT_URI);
-console.log('Current URL:', window.location.href);
 console.log('--- SIMKL DEBUG END ---');
 
 const API_BASE_URL = 'https://api.simkl.com';
@@ -37,14 +29,7 @@ class SimklService {
     }
 
     async exchangeCodeForToken(code: string): Promise<string> {
-        console.log('Simkl Auth: Starting exchange...', {
-            client_id: SIMKL_CLIENT_ID?.substring(0, 5) + '...',
-            redirect_uri: SIMKL_REDIRECT_URI,
-            code: code.substring(0, 5) + '...'
-        });
-
         try {
-            // Some Simkl docs suggest JSON, others form-data. Let's try JSON first as it's what we had.
             const body = {
                 grant_type: 'authorization_code',
                 code,
@@ -53,20 +38,15 @@ class SimklService {
                 redirect_uri: SIMKL_REDIRECT_URI,
             };
 
+            // Try JSON first
             const response = await fetch(`${API_BASE_URL}/oauth/token`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body),
             });
 
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error('Simkl Auth JSON failed:', errorText);
-
                 // Fallback to x-www-form-urlencoded
-                console.log('Simkl Auth: Retrying with x-www-form-urlencoded...');
                 const formBody = new URLSearchParams();
                 Object.entries(body).forEach(([key, value]) => {
                     if (value) formBody.append(key, value);
@@ -74,15 +54,12 @@ class SimklService {
 
                 const fallbackResponse = await fetch(`${API_BASE_URL}/oauth/token`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/x-www-form-urlencoded',
-                    },
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                     body: formBody.toString(),
                 });
 
                 if (!fallbackResponse.ok) {
                     const fallbackError = await fallbackResponse.text();
-                    console.error('Simkl Auth Fallback failed:', fallbackError);
                     throw new Error(`Auth failed: ${fallbackError}`);
                 }
 
