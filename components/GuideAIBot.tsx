@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Bot, X, Send, Minus, MessageSquare, Loader2, ExternalLink, ChevronRight, BrainCircuit, ChevronDown } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { sendMessageToPoe } from '../services/poe';
-import { simklService } from '../services/simkl';
+import { storageService } from '../services/storage';
 
 interface ProcessedMessage {
     textParts: (string | { type: 'citation'; id: number; url: string; title: string })[];
@@ -15,14 +15,9 @@ interface GuideAIBotProps {
 }
 
 const processMessage = (content: string): ProcessedMessage => {
-    // 1. Extract Thinking Process
-    // Robust pattern matching for "Thinking... > ... >" style logs.
-    // We look for a block that generally starts with "Thinking..." and contains log-like ">" lines.
-
     let thought = '';
     let cleanContent = content;
 
-    // Check if content starts with Thinking... (ignoring leading whitespace)
     if (content.trimStart().startsWith('Thinking...') || content.includes('Type:')) {
         const lines = content.split('\n');
         const thoughtLines: string[] = [];
@@ -31,22 +26,10 @@ const processMessage = (content: string): ProcessedMessage => {
 
         for (const line of lines) {
             const trimmed = line.trim();
-
             if (isThinkingBlock) {
-                // Heuristic: If line starts with "Thinking", is empty, or starts with ">", it's likely thought.
-                // Also if it just looks like a continuation of a log line (e.g. indented).
-                // Transition to message happens when we see a line that clearly isn't log-like (no ">") and follows a break?
-
                 if (trimmed.startsWith('Thinking...') || trimmed.startsWith('>') || trimmed === '' || trimmed.includes(' > ')) {
                     thoughtLines.push(line);
                 } else {
-                    // Found a non-log line.
-                    // Is it just a wrapping line of the thought?
-                    // If the previous line was a thought line ending with ">", maybe this is continuation.
-                    // But typically the user format has ">" on every line or "Thinking...".
-
-                    // Let's assume the first non-matching line starts the message, 
-                    // UNLESS it looks very short or structural.
                     isThinkingBlock = false;
                     messageLines.push(line);
                 }
@@ -61,10 +44,8 @@ const processMessage = (content: string): ProcessedMessage => {
         }
     }
 
-    // 2. Process Links
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const rawUrlRegex = /https?:\/\/[^\s]+/g;
-
     const links: { id: number; title: string; url: string }[] = [];
     let citationCount = 0;
 
@@ -98,7 +79,6 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-
     const [activePopupIndex, setActivePopupIndex] = useState<number | null>(null);
     const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set());
 
@@ -129,7 +109,6 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
         if (!inputValue.trim() || isLoading) return;
 
         setActivePopupIndex(null);
-
         const userMessage: ChatMessage = {
             role: 'user',
             content: inputValue,
@@ -141,21 +120,20 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
         setIsLoading(true);
 
         try {
+            const likedItems = storageService.getList('liked');
+            const likedContext = likedItems.length > 0
+                ? `\n\nUser's Liked Movies/Shows (for algorithm): ${likedItems.map(i => i.title || i.name).join(', ')}`
+                : '';
+
             const contextString = contextItem
-                ? `${contextItem.title || contextItem.name} (${contextItem.media_type}), ID: ${contextItem.id}, Overview: ${contextItem.overview.substring(0, 100)}...`
-                : undefined;
+                ? `Current Item Context: ${contextItem.title || contextItem.name} (${contextItem.media_type}), Overview: ${contextItem.overview.substring(0, 100)}...`
+                : 'No specific item context.';
 
-            // Instruct the AI about available actions
-            const instruction = contextItem ? "\n\nIf the user wants to add the current item to their watchlist, output exactly '[ACTION: ADD_TO_WATCHLIST]' at the very end of your message." : "";
+            const responseContent = await sendMessageToPoe(
+                [...messages, userMessage],
+                contextString + likedContext + "\n\nUse the user's Liked items to personalize recommendations. If they ask to add to list, remind them they can use the buttons in the detail view."
+            );
 
-            const responseContent = await sendMessageToPoe([...messages, userMessage], (contextString || '') + instruction);
-
-            // Parse for actions
-            if (responseContent.includes('[ACTION: ADD_TO_WATCHLIST]') && contextItem) {
-                await simklService.addToWatchlist(contextItem.media_type as 'movie' | 'tv' || 'movie', contextItem.id);
-            }
-
-            // Remove action tags from clean content for display
             const displayContent = responseContent.replace(/\[ACTION: [A-Z_]+\]/g, '').trim();
 
             const aiMessage: ChatMessage = {
@@ -221,7 +199,7 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                         {messages.length === 0 ? (
                             <div className="h-full flex flex-col items-center justify-center text-center text-white/40 space-y-3 px-6">
                                 <Bot size={48} className="text-white/20" />
-                                <p className="text-sm">Hi! I'm GuideAI. Ask me anything about movies, shows, or celebrities!</p>
+                                <p className="text-sm">Hi! I'm GuideAI. I've analyzed your liked titles to provide personalized suggestions. Ask me anything!</p>
                             </div>
                         ) : (
                             messages.map((msg, idx) => {
@@ -234,8 +212,6 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
 
                                 return (
                                     <div key={idx} className="flex flex-col w-full">
-
-                                        {/* Thinking Block - OUTSIDE the message bubbles alignment */}
                                         {thought && (
                                             <div className="mb-3 max-w-full px-1">
                                                 <button
@@ -247,7 +223,6 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                                                     <div className="h-px bg-white/5 flex-1 mx-2" />
                                                     <ChevronDown size={12} className={`transition-transform duration-200 ${isThoughtExpanded ? 'rotate-180' : ''}`} />
                                                 </button>
-
                                                 <div className={`overflow-hidden transition-all duration-300 ${isThoughtExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
                                                     <div className="bg-[#111] border border-white/5 rounded-lg p-3 text-[10px] text-white/50 font-mono leading-relaxed whitespace-pre-wrap shadow-inner">
                                                         {thought}
@@ -256,9 +231,7 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                                             </div>
                                         )}
 
-                                        {/* Message Container */}
                                         <div className={`relative flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                            {/* Main Message */}
                                             {textParts.some(p => typeof p === 'string' && p.trim()) && (
                                                 <div
                                                     className={`max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed whitespace-pre-wrap shadow-sm ${msg.role === 'user'
@@ -274,7 +247,6 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                                                 </div>
                                             )}
 
-                                            {/* Source Stack (Grok Style) */}
                                             {links.length > 0 && (
                                                 <div className="mt-2 text-xs">
                                                     <div
@@ -289,7 +261,7 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                                                         </span>
                                                         <div className="flex items-center -space-x-2">
                                                             {links.slice(0, 3).map((link, i) => (
-                                                                <div key={i} className="w-5 h-5 rounded-full border border-[#0A0A0A] bg-white/10 overflow-hidden relative z-[3] first:z-[3] [&:nth-child(2)]:z-[2] [&:nth-child(3)]:z-[1]">
+                                                                <div key={i} className="w-5 h-5 rounded-full border border-[#0A0A0A] bg-white/10 overflow-hidden relative z-[3]">
                                                                     <img
                                                                         src={`https://www.google.com/s2/favicons?domain=${getHostname(link.url)}&sz=64`}
                                                                         className="w-full h-full object-cover"
@@ -297,16 +269,10 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                                                                     />
                                                                 </div>
                                                             ))}
-                                                            {links.length > 3 && (
-                                                                <div className="w-5 h-5 rounded-full border border-[#0A0A0A] bg-white/20 flex items-center justify-center text-[8px] text-white z-0">
-                                                                    +{links.length - 3}
-                                                                </div>
-                                                            )}
                                                         </div>
                                                         <ChevronRight size={12} className={`text-white/40 transition-transform ${isPopupOpen ? 'rotate-90' : ''}`} />
                                                     </div>
 
-                                                    {/* The Popup Menu */}
                                                     {isPopupOpen && (
                                                         <div
                                                             ref={popupRef}
@@ -369,13 +335,10 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                             <button
                                 onClick={handleSendMessage}
                                 disabled={!inputValue.trim() || isLoading}
-                                className="absolute right-2 p-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 disabled:hover:bg-indigo-500 text-white rounded-lg transition-all"
+                                className="absolute right-2 p-1.5 bg-indigo-500 hover:bg-indigo-600 disabled:opacity-50 text-white rounded-lg transition-all"
                             >
                                 {isLoading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                             </button>
-                        </div>
-                        <div className="text-[10px] text-center text-white/20 mt-2">
-                            Powered by Poe & Gemini 3 Flash
                         </div>
                     </div>
                 </div>
@@ -383,9 +346,9 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
 
             <button
                 onClick={toggleChat}
-                className={`group pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-full shadow-lg shadow-indigo-500/20 transition-all duration-300 ${isOpen
-                    ? 'bg-[#1a1a1a] text-white hover:bg-[#252525] border border-white/10'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500 hover:scale-105'
+                className={`group pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all duration-300 ${isOpen
+                    ? 'bg-[#1a1a1a] text-white border border-white/10'
+                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
                     }`}
             >
                 {isOpen ? (
@@ -395,7 +358,7 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
                     </>
                 ) : (
                     <>
-                        <MessageSquare size={20} className="group-hover:animate-pulse" />
+                        <MessageSquare size={20} />
                         <span className="font-medium pr-1">GuideAI</span>
                     </>
                 )}

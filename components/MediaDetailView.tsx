@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { MediaItem, MediaDetail } from '../types';
 import { getMediaDetails, getImageUrl } from '../services/api';
-import { simklService } from '../services/simkl';
+import { storageService } from '../services/storage';
 import { X, Calendar, Star, Clock, Play, DollarSign, Users, Award, ExternalLink, Plus, Check, Heart } from 'lucide-react';
 import ContentRow from './ContentRow';
 
@@ -17,16 +17,19 @@ interface MediaDetailViewProps {
 const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose, onItemClick, onPersonClick, onCollectionClick }) => {
     const [details, setDetails] = useState<MediaDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isAdded, setIsAdded] = useState(false);
-    const [isWatched, setIsWatched] = useState(false);
-    const [addingToList, setAddingToList] = useState(false);
-
-    const isAuthenticated = simklService.isAuthenticated();
+    const [isWantToWatch, setIsWantToWatch] = useState(storageService.isInList('wantToWatch', item.id));
+    const [isWatched, setIsWatched] = useState(storageService.isInList('watched', item.id));
+    const [isLiked, setIsLiked] = useState(storageService.isInList('liked', item.id));
+    const [showSyncPrompt, setShowSyncPrompt] = useState(false);
 
     // When item changes, reset details and fetch new ones
     useEffect(() => {
         setLoading(true);
         setDetails(null);
+        setIsWantToWatch(storageService.isInList('wantToWatch', item.id));
+        setIsWatched(storageService.isInList('watched', item.id));
+        setIsLiked(storageService.isInList('liked', item.id));
+
         getMediaDetails(item.media_type as 'movie' | 'tv' || 'movie', item.id)
             .then((data) => {
                 setDetails(data);
@@ -63,22 +66,40 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(value);
     };
 
-    const handleAddToWatchlist = async () => {
-        if (!isAuthenticated) {
-            // Trigger login flow or show message - for now just alert
-            alert("Please connect Simkl in the 'More' tab to use watchlists!");
-            return;
-        }
-        setAddingToList(true);
-        const success = await simklService.addToWatchlist(item.media_type as 'movie' | 'tv' || 'movie', item.id);
-        if (success) {
-            setIsAdded(true);
-        }
-        setAddingToList(false);
+    const handleToggleList = (type: 'wantToWatch' | 'watched' | 'liked') => {
+        const itemToStore = {
+            id: item.id,
+            title: item.title,
+            name: item.name,
+            poster_path: item.poster_path,
+            backdrop_path: item.backdrop_path,
+            overview: item.overview,
+            media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+            vote_average: item.vote_average,
+            release_date: item.release_date,
+            first_air_date: item.first_air_date
+        };
+
+        const newState = storageService.toggleItem(type, itemToStore);
+
+        if (type === 'wantToWatch') setIsWantToWatch(newState);
+        if (type === 'watched') setIsWatched(newState);
+        if (type === 'liked') setIsLiked(newState);
+
+        // Show sync prompt
+        setShowSyncPrompt(true);
+        setTimeout(() => setShowSyncPrompt(false), 3000);
     };
 
     return (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-hidden">
+            {showSyncPrompt && (
+                <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-2">
+                    <Check size={16} />
+                    Updated locally! Remember to sync other devices in "More" tab.
+                </div>
+            )}
+
             <button
                 onClick={onClose}
                 className="absolute top-4 right-4 md:top-8 md:right-8 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full z-50 backdrop-blur-sm transition-colors ring-1 ring-white/10"
@@ -130,17 +151,12 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                                         <span>{Math.floor(details.runtime / 60)}h {details.runtime % 60}m</span>
                                     </div>
                                 )}
-                                {details?.genres?.slice(0, 3).map(g => (
-                                    <span key={g.id} className="px-3 py-1 border border-white/20 rounded-full text-xs uppercase tracking-wider">
-                                        {g.name}
-                                    </span>
-                                ))}
                             </div>
                         </div>
 
                         <div className="flex flex-col md:flex-row items-center gap-4 mt-2">
                             {trailer && (
-                                <a href="#trailer" className="flex items-center gap-3 bg-white text-black px-8 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-white/10">
+                                <a href="#trailer" className="flex items-center gap-3 bg-white text-black px-6 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-white/10">
                                     <Play size={20} fill="currentColor" />
                                     Watch Trailer
                                 </a>
@@ -148,16 +164,25 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={handleAddToWatchlist}
-                                    disabled={addingToList || isAdded}
-                                    className={`p-4 rounded-full border transition-all ${isAdded ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                                    onClick={() => handleToggleList('wantToWatch')}
+                                    title="Want to Watch"
+                                    className={`p-4 rounded-full border transition-all ${isWantToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                                 >
-                                    {isAdded ? <Check size={20} /> : <Plus size={20} />}
+                                    <Plus size={20} className={isWantToWatch ? 'rotate-45 transition-transform' : ''} />
                                 </button>
                                 <button
-                                    className="p-4 rounded-full bg-white/10 border border-white/20 text-white hover:bg-white/20 transition-all"
+                                    onClick={() => handleToggleList('watched')}
+                                    title="Watched"
+                                    className={`p-4 rounded-full border transition-all ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                                 >
-                                    <Heart size={20} />
+                                    <Check size={20} />
+                                </button>
+                                <button
+                                    onClick={() => handleToggleList('liked')}
+                                    title="Like"
+                                    className={`p-4 rounded-full border transition-all ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                                >
+                                    <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
                                 </button>
                             </div>
                         </div>

@@ -1,15 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
-import { Person, SimklUser } from '../types';
+import { Person } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
-import { simklService } from '../services/simkl';
+import { storageService } from '../services/storage';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
     currentRegion: string;
     onRegionChange: (region: string) => void;
-    simklUser: SimklUser | null;
-    onSimklLogout: () => void;
 }
 
 const regions = [
@@ -29,7 +27,7 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, onSimklLogout }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
 
@@ -42,45 +40,49 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
 
-            {/* Account Section */}
+            {/* Manual Sync Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Account</h2>
-                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
-                    {simklUser ? (
-                        <div className="flex items-center justify-between p-4 border-b border-white/5 bg-white/5">
-                            <div className="flex items-center gap-3">
-                                <img src={simklUser.avatar} alt={simklUser.name} className="w-10 h-10 rounded-full border border-white/10" />
-                                <div>
-                                    <span className="text-white font-medium block">{simklUser.name}</span>
-                                    <span className="text-xs text-gray-400">Simkl Connected</span>
-                                </div>
-                            </div>
-                            <button
-                                onClick={onSimklLogout}
-                                className="p-2 hover:bg-red-500/20 rounded-lg text-red-400 transition-colors"
-                                title="Logout from Simkl"
-                            >
-                                <LogOut size={20} />
-                            </button>
-                        </div>
-                    ) : (
+                <h2 className="text-2xl font-bold text-white mb-6">Manual Sync</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                    <p className="text-gray-400 text-sm">
+                        Privacy first: Your watchlists are stored only on this device.
+                        To sync with another device, copy your sync code and paste it there.
+                    </p>
+
+                    <div className="flex flex-col gap-4">
                         <button
-                            onClick={() => window.location.href = simklService.getLoginUrl()}
-                            className="w-full flex items-center justify-between p-4 hover:bg-white/5 transition-colors"
+                            onClick={() => {
+                                const code = storageService.exportData();
+                                navigator.clipboard.writeText(code);
+                                alert('Sync code copied to clipboard!');
+                            }}
+                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
                         >
-                            <div className="flex items-center gap-3">
-                                <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400"><LogIn size={20} /></div>
-                                <span className="text-white">Connect with Simkl</span>
-                            </div>
-                            <ChevronRight size={16} className="text-gray-400" />
+                            <span>Copy Sync Code</span>
+                            <ChevronRight size={18} />
                         </button>
-                    )}
-                    <div className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400"><User size={20} /></div>
-                            <span className="text-white">Profile Settings</span>
+
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Import from another device</label>
+                            <div className="flex gap-2">
+                                <input
+                                    type="text"
+                                    placeholder="Paste sync code here..."
+                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                            const code = (e.currentTarget as HTMLInputElement).value;
+                                            if (storageService.importData(code)) {
+                                                alert('Data imported successfully! Refreshing...');
+                                                window.location.reload();
+                                            } else {
+                                                alert('Invalid sync code.');
+                                            }
+                                        }
+                                    }}
+                                />
+                            </div>
                         </div>
-                        <ChevronRight size={16} className="text-gray-400" />
                     </div>
                 </div>
             </div>
@@ -131,8 +133,8 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                         setShowRegions(false);
                                     }}
                                     className={`w-full flex items-center justify-between p-4 rounded-xl transition-all ${currentRegion === region.code
-                                            ? 'bg-indigo-600/20 border border-indigo-500/50'
-                                            : 'hover:bg-white/5 border border-transparent'
+                                        ? 'bg-indigo-600/20 border border-indigo-500/50'
+                                        : 'hover:bg-white/5 border border-transparent'
                                         }`}
                                 >
                                     <div className="flex items-center gap-3">

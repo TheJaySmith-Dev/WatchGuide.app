@@ -1,94 +1,70 @@
-import React, { useEffect, useState } from 'react';
-import { simklService } from '../services/simkl';
+import React, { useState } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
-import { Play, Clock, ChevronRight, LogIn } from 'lucide-react';
+import { Play, Heart, Check, Clock, ListPlus } from 'lucide-react';
+import { storageService, ListType } from '../services/storage';
 
 interface MyListProps {
     onItemClick: (item: MediaItem) => void;
 }
 
 const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
-    const [watchlist, setWatchlist] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const isAuthenticated = simklService.isAuthenticated();
+    const [activeList, setActiveList] = useState<ListType>('wantToWatch');
 
-    useEffect(() => {
-        if (isAuthenticated) {
-            setLoading(true);
-            Promise.all([
-                simklService.getWatchlist('movies', 'plantowatch'),
-                simklService.getWatchlist('shows', 'plantowatch')
-            ]).then(([movies, shows]) => {
-                // Map Simkl items to TMDB-like MediaItems for compatibility
-                const movieItems = movies.map(m => ({
-                    id: m.movie.ids.tmdb,
-                    title: m.movie.title,
-                    poster_path: m.movie.poster,
-                    media_type: 'movie' as const,
-                    overview: '', // Simkl might not provide this in list view
-                }));
-                const showItems = shows.map(s => ({
-                    id: s.show.ids.tmdb,
-                    name: s.show.title,
-                    poster_path: s.show.poster,
-                    media_type: 'tv' as const,
-                    overview: '',
-                }));
-                setWatchlist([...movieItems, ...showItems]);
-            }).finally(() => setLoading(false));
-        } else {
-            setLoading(false);
-        }
-    }, [isAuthenticated]);
+    const lists: { id: ListType; label: string; icon: any; color: string }[] = [
+        { id: 'wantToWatch', label: 'Want To Watch', icon: ListPlus, color: 'text-indigo-400' },
+        { id: 'watched', label: 'Watched', icon: Check, color: 'text-green-400' },
+        { id: 'liked', label: 'Liked', icon: Heart, color: 'text-rose-400' }
+    ];
 
-    if (!isAuthenticated) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-                <div className="w-20 h-20 bg-indigo-500/20 rounded-full flex items-center justify-center mb-6">
-                    <Clock size={40} className="text-indigo-400" />
-                </div>
-                <h2 className="text-2xl font-bold text-white mb-2">Your Watchlist</h2>
-                <p className="text-gray-400 max-w-sm mb-8">
-                    Connect your Simkl account to sync your watchlist and track your progress across all devices.
-                </p>
-                <button
-                    onClick={() => window.location.href = simklService.getLoginUrl()}
-                    className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-3 rounded-full font-bold transition-all"
-                >
-                    <LogIn size={20} />
-                    Connect Simkl
-                </button>
-            </div>
-        );
-    }
-
-    if (loading) {
-        return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
+    const currentList = storageService.getList(activeList);
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32">
             <header className="mb-10">
-                <h1 className="text-4xl font-black text-white">My List</h1>
-                <p className="text-gray-400 mt-2">Titles syncing from Simkl</p>
+                <h1 className="text-4xl font-black text-white">My Library</h1>
+                <p className="text-gray-400 mt-2">Privacy-first local storage</p>
             </header>
 
-            {watchlist.length === 0 ? (
+            {/* List Selector Tabs */}
+            <div className="flex gap-2 mb-8 overflow-x-auto pb-2 hide-scrollbar">
+                {lists.map(list => {
+                    const Icon = list.icon;
+                    const isActive = activeList === list.id;
+                    return (
+                        <button
+                            key={list.id}
+                            onClick={() => setActiveList(list.id)}
+                            className={`flex items-center gap-2 px-6 py-3 rounded-full border transition-all shrink-0 font-medium ${isActive
+                                    ? 'bg-white/10 border-white/20 text-white shadow-xl'
+                                    : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'
+                                }`}
+                        >
+                            <Icon size={18} className={isActive ? list.color : ''} fill={isActive && list.id === 'liked' ? 'currentColor' : 'none'} />
+                            <span>{list.label}</span>
+                            <span className={`text-xs px-2 py-0.5 rounded-full ${isActive ? 'bg-white/10 text-white' : 'bg-white/5 text-gray-600'}`}>
+                                {storageService.getList(list.id).length}
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+
+            {currentList.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center">
-                    <p className="text-gray-400">Your watchlist is empty. Add titles from Browse or Search!</p>
+                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
+                        <Clock size={32} className="text-gray-600" />
+                    </div>
+                    <h3 className="text-white font-bold text-lg mb-1">Your list is empty</h3>
+                    <p className="text-gray-500 max-w-sm mx-auto">Add titles from Browse or Search to start buildling your local library.</p>
                 </div>
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                    {watchlist.map((item, idx) => (
+                    {currentList.map((item) => (
                         <div
-                            key={`${item.id}-${idx}`}
+                            key={item.id}
                             onClick={() => onItemClick(item)}
-                            className="group cursor-pointer space-y-3"
+                            className="group cursor-pointer space-y-3 animate-fade-in"
                         >
                             <div className="aspect-[2/3] rounded-2xl overflow-hidden relative border border-white/10 shadow-lg">
                                 <img

@@ -17,26 +17,8 @@ const App: React.FC = () => {
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
-  const [simklUser, setSimklUser] = useState<SimklUser | null>(null);
-
   // Default to US, can be persisted in localStorage in a real app
   const [region, setRegion] = useState('US');
-
-  useEffect(() => {
-    // Check for Simkl OAuth code in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const code = urlParams.get('code');
-
-    if (code) {
-      simklService.exchangeCodeForToken(code).then(() => {
-        // Clean up URL
-        window.history.replaceState({}, document.title, window.location.pathname);
-        return simklService.getUserProfile();
-      }).then(user => setSimklUser(user));
-    } else if (simklService.isAuthenticated()) {
-      simklService.getUserProfile().then(user => setSimklUser(user));
-    }
-  }, []);
 
   const handleMediaClick = (item: MediaItem) => {
     // Reset others to simulate navigation
@@ -80,11 +62,6 @@ const App: React.FC = () => {
             onPersonClick={handlePersonClick}
             currentRegion={region}
             onRegionChange={setRegion}
-            simklUser={simklUser}
-            onSimklLogout={() => {
-              simklService.logout();
-              setSimklUser(null);
-            }}
           />
         );
       default:
