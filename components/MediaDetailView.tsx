@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { MediaItem, MediaDetail } from '../types';
 import { getMediaDetails, getImageUrl } from '../services/api';
 import { storageService } from '../services/storage';
+import { copyToClipboard } from '../services/clipboard';
 import { X, Calendar, Star, Clock, Play, DollarSign, Users, Award, ExternalLink, Plus, Check, Heart } from 'lucide-react';
 import ContentRow from './ContentRow';
 
@@ -101,11 +102,15 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                     </div>
                     <div className="w-px h-4 bg-white/20" />
                     <button
-                        onClick={(e) => {
+                        onClick={async (e) => {
                             e.stopPropagation();
                             const code = storageService.exportData();
-                            navigator.clipboard.writeText(code);
-                            alert('Sync Code copied!');
+                            const success = await copyToClipboard(code);
+                            if (success) {
+                                alert('Sync Code copied!');
+                            } else {
+                                alert('Failed to copy.');
+                            }
                         }}
                         className="hover:text-indigo-200 transition-colors flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20"
                     >

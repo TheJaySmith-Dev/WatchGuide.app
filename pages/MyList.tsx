@@ -3,6 +3,7 @@ import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { Play, Heart, Check, Clock, ListPlus, Copy, Share2 } from 'lucide-react';
 import { storageService, ListType } from '../services/storage';
+import { copyToClipboard } from '../services/clipboard';
 
 interface MyListProps {
     onItemClick: (item: MediaItem) => void;
@@ -28,10 +29,14 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                 </div>
                 <div className="flex gap-2">
                     <button
-                        onClick={() => {
+                        onClick={async () => {
                             const code = storageService.exportData();
-                            navigator.clipboard.writeText(code);
-                            alert('Sync Code copied! Paste this on another device to sync your data.');
+                            const success = await copyToClipboard(code);
+                            if (success) {
+                                alert('Sync Code copied! Paste this on another device to sync your data.');
+                            } else {
+                                alert('Failed to copy. Please try again.');
+                            }
                         }}
                         className="flex items-center gap-2 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 hover:text-indigo-300 text-sm font-medium"
                     >
@@ -40,13 +45,17 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                     </button>
                     {currentList.length > 0 && (
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 const items = storageService.getList(activeList);
                                 const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
                                 const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
 
-                                navigator.clipboard.writeText(header + listText);
-                                alert('List copied to clipboard as text!');
+                                const success = await copyToClipboard(header + listText);
+                                if (success) {
+                                    alert('List copied to clipboard as text!');
+                                } else {
+                                    alert('Failed to copy. Please try again.');
+                                }
                             }}
                             className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
                         >

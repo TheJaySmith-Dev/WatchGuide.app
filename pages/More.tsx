@@ -3,6 +3,7 @@ import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
 import { storageService } from '../services/storage';
+import { copyToClipboard } from '../services/clipboard';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -51,10 +52,14 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
                     <div className="flex flex-col gap-4">
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 const code = storageService.exportData();
-                                navigator.clipboard.writeText(code);
-                                alert('Sync code copied to clipboard!');
+                                const success = await copyToClipboard(code);
+                                if (success) {
+                                    alert('Sync code copied to clipboard!');
+                                } else {
+                                    alert('Failed to copy. Please try again.');
+                                }
                             }}
                             className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
                         >

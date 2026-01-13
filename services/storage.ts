@@ -63,17 +63,28 @@ class StorageService {
     }
 
     exportData(): string {
-        return btoa(JSON.stringify(this.data));
+        try {
+            const str = JSON.stringify(this.data);
+            // Support Unicode by encoding to UTF-8 before btoa
+            return btoa(unescape(encodeURIComponent(str)));
+        } catch (e) {
+            console.error('Export failed:', e);
+            return "";
+        }
     }
 
     importData(syncString: string): boolean {
+        if (!syncString) return false;
         try {
-            const decoded = atob(syncString);
+            const decoded = decodeURIComponent(escape(atob(syncString.trim())));
             const newData = JSON.parse(decoded);
 
             // Basic validation
             if (newData.wantToWatch && newData.watched && newData.liked) {
-                this.data = newData;
+                this.data = {
+                    ...this.data,
+                    ...newData
+                };
                 this.save();
                 return true;
             }
