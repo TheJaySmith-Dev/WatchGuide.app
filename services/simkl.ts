@@ -1,12 +1,24 @@
 import { MediaItem, SimklUser, SimklList } from '../types';
 
-const SIMKL_CLIENT_ID = (import.meta.env.VITE_SIMKL_CLIENT_ID || '').trim();
-const SIMKL_CLIENT_SECRET = (import.meta.env.VITE_SIMKL_CLIENT_SECRET || '').trim();
+const SIMKL_CLIENT_ID = (import.meta.env.VITE_SIMKL_CLIENT_ID || 'ae388b07e6b83e08f7f2da02cdaa8dacb3c58b49a86e686ad79231d4612372b9').trim();
+const SIMKL_CLIENT_SECRET = (import.meta.env.VITE_SIMKL_CLIENT_SECRET || '115a54c1d89ff52dc607a292a2b74efd6d6eb1ed9ca84ffae02bda900975bc48').trim();
 
-// Strictly use the production Redirect URI for troubleshooting.
-const SIMKL_REDIRECT_URI = (import.meta.env.VITE_SIMKL_REDIRECT_URI || 'https://watchguide.app').replace(/\/$/, '');
+// Support both watchguide.app and www.watchguide.app automatically
+const currentOrigin = window.location.origin.replace(/\/$/, '');
+const envRedirectUri = (import.meta.env.VITE_SIMKL_REDIRECT_URI || '').trim().replace(/\/$/, '');
 
-console.log('Simkl Service: Using Redirect URI:', SIMKL_REDIRECT_URI);
+// THE FIX: If envRedirectUri is provided but doesn't have a protocol, add one.
+// If not provided, use the current window origin (standard OAuth practice).
+const SIMKL_REDIRECT_URI = envRedirectUri
+    ? (envRedirectUri.startsWith('http') ? envRedirectUri : `https://${envRedirectUri}`)
+    : currentOrigin;
+
+console.log('--- SIMKL DEBUG START ---');
+console.log('Client ID (Length):', SIMKL_CLIENT_ID.length);
+console.log('Redirect URI:', SIMKL_REDIRECT_URI);
+console.log('Current URL:', window.location.href);
+console.log('--- SIMKL DEBUG END ---');
+
 const API_BASE_URL = 'https://api.simkl.com';
 
 class SimklService {
