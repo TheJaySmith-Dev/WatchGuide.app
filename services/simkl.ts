@@ -5,6 +5,10 @@ const SIMKL_CLIENT_SECRET = import.meta.env.VITE_SIMKL_CLIENT_SECRET;
 const SIMKL_REDIRECT_URI = window.location.origin;
 const API_BASE_URL = 'https://api.simkl.com';
 
+if (!SIMKL_CLIENT_ID) {
+    console.warn('Simkl Error: VITE_SIMKL_CLIENT_ID is not defined. Make sure .env exists and dev server was restarted.');
+}
+
 class SimklService {
     private accessToken: string | null = null;
 
