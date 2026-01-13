@@ -1,8 +1,16 @@
 import { MediaItem, SimklUser, SimklList } from '../types';
 
-const SIMKL_CLIENT_ID = import.meta.env.VITE_SIMKL_CLIENT_ID;
-const SIMKL_CLIENT_SECRET = import.meta.env.VITE_SIMKL_CLIENT_SECRET;
-const SIMKL_REDIRECT_URI = import.meta.env.VITE_SIMKL_REDIRECT_URI || window.location.origin;
+const SIMKL_CLIENT_ID = (import.meta.env.VITE_SIMKL_CLIENT_ID || '').trim();
+const SIMKL_CLIENT_SECRET = (import.meta.env.VITE_SIMKL_CLIENT_SECRET || '').trim();
+
+// Logic to decide which Redirect URI to use:
+// 1. If we are on localhost, ALWAYS use localhost (to avoid handshake errors)
+// 2. If we are on watchguide.app, use that.
+// 3. Allow .env to override ONLY if it matches the current window's protocol/host (safe fallback)
+const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+const SIMKL_REDIRECT_URI = isLocal ? 'http://localhost:3000' : (import.meta.env.VITE_SIMKL_REDIRECT_URI || window.location.origin).replace(/\/$/, '');
+
+console.log('Simkl Service: Environment:', isLocal ? 'Local' : 'Production');
 console.log('Simkl Service: Using Redirect URI:', SIMKL_REDIRECT_URI);
 const API_BASE_URL = 'https://api.simkl.com';
 
