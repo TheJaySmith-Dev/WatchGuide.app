@@ -21,9 +21,27 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32">
-            <header className="mb-10">
-                <h1 className="text-4xl font-black text-white">My Library</h1>
-                <p className="text-gray-400 mt-2">Privacy-first local storage</p>
+            <header className="mb-10 flex justify-between items-start">
+                <div>
+                    <h1 className="text-4xl font-black text-white">My Library</h1>
+                    <p className="text-gray-400 mt-2">Privacy-first local storage</p>
+                </div>
+                <button
+                    onClick={() => {
+                        const items = storageService.getList(activeList);
+                        if (items.length === 0) return alert('List is empty');
+
+                        const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
+                        const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
+
+                        navigator.clipboard.writeText(header + listText);
+                        alert('List copied to clipboard as text!');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
+                >
+                    <Copy size={16} />
+                    <span>Copy List</span>
+                </button>
             </header>
 
             {/* List Selector Tabs */}
@@ -36,8 +54,8 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                             key={list.id}
                             onClick={() => setActiveList(list.id)}
                             className={`flex items-center gap-2 px-6 py-3 rounded-full border transition-all shrink-0 font-medium ${isActive
-                                    ? 'bg-white/10 border-white/20 text-white shadow-xl'
-                                    : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'
+                                ? 'bg-white/10 border-white/20 text-white shadow-xl'
+                                : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'
                                 }`}
                         >
                             <Icon size={18} className={isActive ? list.color : ''} fill={isActive && list.id === 'liked' ? 'currentColor' : 'none'} />
