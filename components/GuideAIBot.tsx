@@ -12,6 +12,7 @@ interface ProcessedMessage {
 
 interface GuideAIBotProps {
     contextItem?: import('../types').MediaItem | null;
+    isMobileInline?: boolean;
 }
 
 const processMessage = (content: string): ProcessedMessage => {
@@ -74,7 +75,7 @@ const processMessage = (content: string): ProcessedMessage => {
     };
 };
 
-const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
+const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem, isMobileInline = false }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
@@ -175,9 +176,9 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
     };
 
     return (
-        <div className="fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none">
+        <div className={isMobileInline ? "relative" : "fixed bottom-6 right-6 z-50 flex flex-col items-end pointer-events-none"}>
             {isOpen && (
-                <div className="mb-4 w-[350px] sm:w-[400px] h-[550px] bg-[#0A0A0A]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden pointer-events-auto transition-all duration-300 origin-bottom-right animate-in fade-in zoom-in-95">
+                <div className={`${isMobileInline ? "relative mb-4 w-full h-[500px]" : "fixed bottom-24 right-6 mb-4 w-[350px] sm:w-[400px] h-[550px]"} bg-[#0A0A0A]/95 backdrop-blur-xl border border-white/10 rounded-2xl shadow-2xl flex flex-col overflow-hidden pointer-events-auto transition-all duration-300 origin-bottom-right animate-in fade-in zoom-in-95`}>
                     <div className="flex items-center justify-between p-4 border-b border-white/10 bg-white/5">
                         <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center">
@@ -346,22 +347,16 @@ const GuideAIBot: React.FC<GuideAIBotProps> = ({ contextItem }) => {
 
             <button
                 onClick={toggleChat}
-                className={`group pointer-events-auto flex items-center gap-2 px-4 py-3 rounded-full shadow-lg transition-all duration-300 ${isOpen
-                    ? 'bg-[#1a1a1a] text-white border border-white/10'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-500'
-                    }`}
+                className={`group pointer-events-auto flex items-center gap-2 px-6 py-4 rounded-2xl shadow-lg transition-all duration-300 ${isMobileInline ? "w-full justify-between bg-white/5 border border-white/10 text-white" : (isOpen ? 'bg-[#1a1a1a] text-white border border-white/10' : 'bg-indigo-600 text-white hover:bg-indigo-500')}`}
             >
-                {isOpen ? (
-                    <>
-                        <X size={20} />
-                        <span className="font-medium pr-1">Close</span>
-                    </>
-                ) : (
-                    <>
-                        <MessageSquare size={20} />
-                        <span className="font-medium pr-1">GuideAI</span>
-                    </>
-                )}
+                <div className="flex items-center gap-3">
+                    <div className={`p-2 rounded-lg ${isMobileInline ? 'bg-indigo-500/20 text-indigo-400' : ''}`}>
+                        {isOpen ? <X size={20} /> : <BrainCircuit size={20} />}
+                    </div>
+                    <span className="font-bold">GuideAI Assistant</span>
+                </div>
+                {isMobileInline && !isOpen && <ChevronRight size={18} className="text-gray-500" />}
+                {isOpen && <Minus size={18} className="text-gray-500" />}
             </button>
         </div>
     );

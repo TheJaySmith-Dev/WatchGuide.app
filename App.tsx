@@ -115,8 +115,10 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* GuideAI Assistant */}
-      <GuideAIBot contextItem={selectedItem} />
+      {/* GuideAI Assistant - Desktop Floating */}
+      <div className="hidden md:block">
+        <GuideAIBot contextItem={selectedItem} />
+      </div>
     </div>
   );
 };

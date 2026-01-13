@@ -4,6 +4,7 @@ import { Person } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { copyToClipboard } from '../services/clipboard';
+import GuideAIBot from '../components/GuideAIBot';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -40,6 +41,12 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
+
+            {/* GuideAI Section - Only on Mobile */}
+            <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
+                <GuideAIBot isMobileInline={true} />
+            </div>
 
             {/* Manual Sync Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
