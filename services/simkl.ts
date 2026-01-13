@@ -2,7 +2,7 @@ import { MediaItem, SimklUser, SimklList } from '../types';
 
 const SIMKL_CLIENT_ID = import.meta.env.VITE_SIMKL_CLIENT_ID;
 const SIMKL_CLIENT_SECRET = import.meta.env.VITE_SIMKL_CLIENT_SECRET;
-const SIMKL_REDIRECT_URI = window.location.origin;
+const SIMKL_REDIRECT_URI = import.meta.env.VITE_SIMKL_REDIRECT_URI || window.location.origin;
 const API_BASE_URL = 'https://api.simkl.com';
 
 class SimklService {
