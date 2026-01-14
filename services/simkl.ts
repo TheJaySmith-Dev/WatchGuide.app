@@ -1,8 +1,8 @@
 import { MediaItem } from '../types';
 
 // Simkl API Configuration
-const SIMKL_CLIENT_ID = 'YOUR_CLIENT_ID_HERE'; // Replace with your Simkl client ID
-const SIMKL_CLIENT_SECRET = 'YOUR_CLIENT_SECRET_HERE'; // Replace with your Simkl client secret
+const SIMKL_CLIENT_ID = 'ae388b07e6b83e08f7f2da02cdaa8dacb3c58b49a86e686ad79231d4612372b9';
+const SIMKL_CLIENT_SECRET = '115a54c1d89ff52dc607a292a2b74efd6d6eb1ed9ca84ffae02bda900975bc48';
 const SIMKL_REDIRECT_URI = window.location.origin + '/'; // OAuth redirect
 
 const SIMKL_AUTH_URL = 'https://simkl.com/oauth/authorize';
