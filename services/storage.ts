@@ -91,9 +91,10 @@ class StorageService {
             } else {
                 this.cache[type] = list.filter(i => i.id !== item.id);
             }
+            return isAdding; // Return true if added, false if removed
         }
 
-        return success ? isAdding : !isAdding;
+        return !isAdding; // If failed, return current state (opposite of what we tried)
     }
 
     // Check if item is in list

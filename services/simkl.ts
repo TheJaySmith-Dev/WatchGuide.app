@@ -123,7 +123,10 @@ class SimklService {
         if (!this.accessToken) return false;
 
         const mediaType = item.media_type === 'movie' ? 'movies' : 'shows';
-        const endpoint = `${SIMKL_API_BASE}/sync/history/remove`;
+        // Different endpoints for watchlist vs watched
+        const endpoint = listType === 'watchlist'
+            ? `${SIMKL_API_BASE}/sync/remove-from-list`
+            : `${SIMKL_API_BASE}/sync/history/remove`;
 
         try {
             const payload = {
