@@ -75,60 +75,9 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                     Logout
                                 </button>
                             </div>
-
-                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                                <div>
-                                    <p className="text-white font-medium">Automatic Cloud Sync</p>
-                                    <p className="text-gray-400 text-xs mt-1">
-                                        {simklSyncEnabled ? 'Changes sync automatically' : 'Sync manually when needed'}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        const newState = !simklSyncEnabled;
-                                        storageService.setSimklSyncEnabled(newState);
-                                        setSimklSyncEnabled(newState);
-                                    }}
-                                    className={`relative w-14 h-8 rounded-full transition-colors ${simklSyncEnabled ? 'bg-indigo-600' : 'bg-gray-600'
-                                        }`}
-                                >
-                                    <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${simklSyncEnabled ? 'translate-x-6' : 'translate-x-0'
-                                        }`} />
-                                </button>
-                            </div>
-
-                            {storageService.getLastSimklSync() && (
-                                <p className="text-gray-500 text-xs text-center">
-                                    Last synced: {new Date(storageService.getLastSimklSync()!).toLocaleString()}
-                                </p>
-                            )}
-
-                            <button
-                                onClick={async () => {
-                                    setIsSyncing(true);
-                                    const wantToWatch = storageService.getList('wantToWatch');
-                                    const watched = storageService.getList('watched');
-                                    const result = await simklService.syncAllToSimkl(wantToWatch, watched);
-                                    setIsSyncing(false);
-                                    if (result.success) {
-                                        storageService.updateLastSimklSync();
-                                        alert(`Successfully synced ${result.synced} items to Simkl!`);
-                                    } else {
-                                        alert('Failed to sync some items. Please try again.');
-                                    }
-                                }}
-                                disabled={isSyncing}
-                                className="w-full flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white text-sm font-medium disabled:opacity-50"
-                            >
-                                {isSyncing ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                        <span>Syncing...</span>
-                                    </>
-                                ) : (
-                                    <span>Sync All Lists to Simkl</span>
-                                )}
-                            </button>
+                            <p className="text-gray-400 text-sm text-center">
+                                All your watchlists are automatically synced with Simkl
+                            </p>
                         </>
                     ) : (
                         <>
