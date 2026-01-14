@@ -1,4 +1,5 @@
-import { MediaItem } from '../types';
+import { MediaItem, SimklListItem, SimklUser } from '../types';
+import { searchMulti } from './api';
 
 // Simkl API Configuration
 const SIMKL_CLIENT_ID = 'ae388b07e6b83e08f7f2da02cdaa8dacb3c58b49a86e686ad79231d4612372b9';
@@ -8,23 +9,6 @@ const SIMKL_REDIRECT_URI = window.location.origin + '/'; // OAuth redirect
 const SIMKL_AUTH_URL = 'https://simkl.com/oauth/authorize';
 const SIMKL_TOKEN_URL = 'https://api.simkl.com/oauth/token';
 const SIMKL_API_BASE = 'https://api.simkl.com';
-
-export interface SimklUser {
-    user: {
-        name: string;
-        avatar: string;
-    };
-}
-
-export interface SimklListItem {
-    title: string;
-    year?: number;
-    ids: {
-        simkl?: number;
-        tmdb?: number;
-        imdb?: string;
-    };
-}
 
 class SimklService {
     private accessToken: string | null = null;
@@ -250,6 +234,29 @@ class SimklService {
             console.error('Bulk sync error:', error);
             return { success: false, synced: syncedCount };
         }
+    }
+
+    // Convert Simkl list items to MediaItem format
+    async convertToMediaItems(simklItems: SimklListItem[]): Promise<MediaItem[]> {
+        const mediaItems: MediaItem[] = [];
+
+        for (const simklItem of simklItems) {
+            if (!simklItem.ids.tmdb) continue;
+
+            try {
+                // Search TMDB by title to get full MediaItem data
+                const results = await searchMulti(simklItem.title);
+                const match = results.find(r => r.id === simklItem.ids.tmdb);
+
+                if (match) {
+                    mediaItems.push(match);
+                }
+            } catch (error) {
+                console.error(`Failed to convert ${simklItem.title}:`, error);
+            }
+        }
+
+        return mediaItems;
     }
 }
 

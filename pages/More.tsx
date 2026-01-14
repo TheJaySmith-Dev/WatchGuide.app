@@ -3,7 +3,6 @@ import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
 import { storageService } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
 import { simklService } from '../services/simkl';
 import GuideAIBot from '../components/GuideAIBot';
 
@@ -34,8 +33,6 @@ const regions = [
 const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
-    const [simklSyncEnabled, setSimklSyncEnabled] = useState(storageService.isSimklSyncEnabled());
-    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
@@ -148,70 +145,6 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                         </>
                     )}
                 </div>
-            </div>
-
-            {/* Manual Sync Section */}
-            <div className="max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Manual Sync</h2>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
-                    <p className="text-gray-400 text-sm">
-                        Privacy first: Your watchlists are stored only on this device.
-                        To sync with another device, copy your sync code and paste it there.
-                    </p>
-
-                    <div className="flex flex-col gap-4">
-                        <button
-                            onClick={async () => {
-                                const code = storageService.exportData();
-                                const success = await copyToClipboard(code);
-                                if (success) {
-                                    alert('Sync code copied to clipboard!');
-                                } else {
-                                    alert('Failed to copy. Please try again.');
-                                }
-                            }}
-                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
-                        >
-                            <span>Copy Sync Code</span>
-                            <ChevronRight size={18} />
-                        </button>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Import from another device</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Paste sync code here..."
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const code = (e.currentTarget as HTMLInputElement).value;
-                                            if (storageService.importData(code)) {
-                                                alert('Data imported successfully! Refreshing...');
-                                                window.location.reload();
-                                            } else {
-                                                alert('Invalid sync code.');
-                                            }
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    onClick={() => {
-                        if (confirm('Are you sure you want to delete all local watchlists? This cannot be undone.')) {
-                            localStorage.removeItem('watchguide_user_data');
-                            window.location.reload();
-                        }
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-rose-600/10 border border-rose-500/20 rounded-xl hover:bg-rose-600/20 transition-all text-rose-400 text-xs font-bold uppercase tracking-widest mt-4"
-                >
-                    <span>Reset All Local Data</span>
-                    <X size={14} />
-                </button>
             </div>
 
             {/* Settings Section */}
