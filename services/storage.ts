@@ -8,6 +8,8 @@ export interface UserData {
     liked: MediaItem[];
     aiRecommendations?: MediaItem[];
     aiTimestamp?: number;
+    simklSyncEnabled?: boolean;
+    lastSimklSync?: number;
 }
 
 const STORAGE_KEY = 'watchguide_user_data';
@@ -20,7 +22,8 @@ class StorageService {
         this.data = saved ? JSON.parse(saved) : {
             wantToWatch: [],
             watched: [],
-            liked: []
+            liked: [],
+            simklSyncEnabled: false
         };
     }
 
@@ -93,6 +96,28 @@ class StorageService {
             console.error('Import failed:', e);
             return false;
         }
+    }
+
+    // Simkl Sync Methods
+    isSimklSyncEnabled(): boolean {
+        return this.data.simklSyncEnabled || false;
+    }
+
+    setSimklSyncEnabled(enabled: boolean) {
+        this.data.simklSyncEnabled = enabled;
+        if (enabled) {
+            this.data.lastSimklSync = Date.now();
+        }
+        this.save();
+    }
+
+    updateLastSimklSync() {
+        this.data.lastSimklSync = Date.now();
+        this.save();
+    }
+
+    getLastSimklSync(): number | undefined {
+        return this.data.lastSimklSync;
     }
 }
 

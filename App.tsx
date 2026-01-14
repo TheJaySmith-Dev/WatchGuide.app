@@ -9,20 +9,36 @@ import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
 import GuideAIBot from './components/GuideAIBot';
-import { MediaItem } from './types';
+import { simklService } from './services/simkl';
+import { MediaItem, SimklUser } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('browse');
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null);
   const [selectedPersonId, setSelectedPersonId] = useState<number | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
-  // Default to US, can be persisted in localStorage in a real app
   const [region, setRegion] = useState('US');
+  const [simklUser, setSimklUser] = useState<SimklUser | null>(null);
 
   useEffect(() => {
-    // Purge residual Simkl data from legacy versions
-    localStorage.removeItem('simkl_access_token');
-    localStorage.removeItem('simkl_user');
+    // Handle Simkl OAuth callback
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+
+    if (code) {
+      simklService.handleOAuthCallback(code).then(success => {
+        if (success) {
+          simklService.getCurrentUser().then(user => {
+            setSimklUser(user);
+            // Clean up URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+          });
+        }
+      });
+    } else if (simklService.isAuthenticated()) {
+      // Load existing user
+      simklService.getCurrentUser().then(setSimklUser);
+    }
   }, []);
 
   const handleMediaClick = (item: MediaItem) => {
@@ -67,6 +83,7 @@ const App: React.FC = () => {
             onPersonClick={handlePersonClick}
             currentRegion={region}
             onRegionChange={setRegion}
+            simklUser={simklUser}
           />
         );
       default:

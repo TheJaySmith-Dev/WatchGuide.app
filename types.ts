@@ -128,3 +128,21 @@ export interface ChatMessage {
   content: string;
   timestamp?: number;
 }
+
+// Simkl Types
+export interface SimklUser {
+  user: {
+    name: string;
+    avatar: string;
+  };
+}
+
+export interface SimklListItem {
+  title: string;
+  year?: number;
+  ids: {
+    simkl?: number;
+    tmdb?: number;
+    imdb?: string;
+  };
+}

@@ -4,12 +4,14 @@ import { Person } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { copyToClipboard } from '../services/clipboard';
+import { simklService } from '../services/simkl';
 import GuideAIBot from '../components/GuideAIBot';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
     currentRegion: string;
     onRegionChange: (region: string) => void;
+    simklUser?: any;
 }
 
 const regions = [
@@ -29,9 +31,10 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
+    const [simklSyncEnabled, setSimklSyncEnabled] = useState(storageService.isSimklSyncEnabled());
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
@@ -46,6 +49,77 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
                 <GuideAIBot isMobileInline={true} />
+            </div>
+
+            {/* Cloud Sync Section */}
+            <div className="max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Cloud Sync</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                    {simklUser ? (
+                        <>
+                            <div className="flex items-center gap-4">
+                                <img
+                                    src={simklUser.user.avatar}
+                                    alt={simklUser.user.name}
+                                    className="w-12 h-12 rounded-full border-2 border-indigo-500"
+                                />
+                                <div className="flex-1">
+                                    <p className="text-white font-medium">{simklUser.user.name}</p>
+                                    <p className="text-gray-400 text-sm">Connected to Simkl</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        simklService.logout();
+                                        window.location.reload();
+                                    }}
+                                    className="px-4 py-2 bg-rose-600/20 border border-rose-500/30 rounded-xl hover:bg-rose-600/30 transition-all text-rose-400 text-sm font-medium"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
+                                <div>
+                                    <p className="text-white font-medium">Automatic Cloud Sync</p>
+                                    <p className="text-gray-400 text-xs mt-1">
+                                        {simklSyncEnabled ? 'Changes sync automatically' : 'Sync manually when needed'}
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        const newState = !simklSyncEnabled;
+                                        storageService.setSimklSyncEnabled(newState);
+                                        setSimklSyncEnabled(newState);
+                                    }}
+                                    className={`relative w-14 h-8 rounded-full transition-colors ${simklSyncEnabled ? 'bg-indigo-600' : 'bg-gray-600'
+                                        }`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${simklSyncEnabled ? 'translate-x-6' : 'translate-x-0'
+                                        }`} />
+                                </button>
+                            </div>
+
+                            {storageService.getLastSimklSync() && (
+                                <p className="text-gray-500 text-xs text-center">
+                                    Last synced: {new Date(storageService.getLastSimklSync()!).toLocaleString()}
+                                </p>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <p className="text-gray-400 text-sm">
+                                Connect to Simkl for automatic cloud sync across all your devices.
+                            </p>
+                            <button
+                                onClick={() => simklService.initiateOAuth()}
+                                className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
+                            >
+                                <span>Connect Simkl Account</span>
+                                <ChevronRight size={18} />
+                            </button>
+                        </>
+                    )}
+                </div>
             </div>
 
             {/* Manual Sync Section */}
