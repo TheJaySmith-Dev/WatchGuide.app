@@ -35,6 +35,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
     const [simklSyncEnabled, setSimklSyncEnabled] = useState(storageService.isSimklSyncEnabled());
+    const [isSyncing, setIsSyncing] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
@@ -104,6 +105,33 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                     Last synced: {new Date(storageService.getLastSimklSync()!).toLocaleString()}
                                 </p>
                             )}
+
+                            <button
+                                onClick={async () => {
+                                    setIsSyncing(true);
+                                    const wantToWatch = storageService.getList('wantToWatch');
+                                    const watched = storageService.getList('watched');
+                                    const result = await simklService.syncAllToSimkl(wantToWatch, watched);
+                                    setIsSyncing(false);
+                                    if (result.success) {
+                                        storageService.updateLastSimklSync();
+                                        alert(`Successfully synced ${result.synced} items to Simkl!`);
+                                    } else {
+                                        alert('Failed to sync some items. Please try again.');
+                                    }
+                                }}
+                                disabled={isSyncing}
+                                className="w-full flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white text-sm font-medium disabled:opacity-50"
+                            >
+                                {isSyncing ? (
+                                    <>
+                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                                        <span>Syncing...</span>
+                                    </>
+                                ) : (
+                                    <span>Sync All Lists to Simkl</span>
+                                )}
+                            </button>
                         </>
                     ) : (
                         <>

@@ -1,4 +1,5 @@
 import { MediaItem } from '../types';
+import { simklService } from './simkl';
 
 export type ListType = 'wantToWatch' | 'watched' | 'liked';
 
@@ -38,6 +39,7 @@ class StorageService {
     toggleItem(type: ListType, item: MediaItem) {
         const list = this.data[type];
         const index = list.findIndex(i => i.id === item.id);
+        const isAdding = index === -1;
 
         if (index > -1) {
             this.data[type] = list.filter(i => i.id !== item.id);
@@ -45,6 +47,25 @@ class StorageService {
             this.data[type] = [...list, item];
         }
         this.save();
+
+        // Sync to Simkl if enabled and authenticated
+        if (this.isSimklSyncEnabled() && simklService.isAuthenticated()) {
+            if (type === 'wantToWatch') {
+                if (isAdding) {
+                    simklService.addToList(item, 'watchlist');
+                } else {
+                    simklService.removeFromList(item, 'watchlist');
+                }
+            } else if (type === 'watched') {
+                if (isAdding) {
+                    simklService.addToList(item, 'watched');
+                } else {
+                    simklService.removeFromList(item, 'watched');
+                }
+            }
+            this.updateLastSimklSync();
+        }
+
         return this.isInList(type, item.id);
     }
 

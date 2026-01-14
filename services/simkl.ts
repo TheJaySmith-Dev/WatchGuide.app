@@ -222,6 +222,35 @@ class SimklService {
         localStorage.removeItem('simkl_access_token');
         localStorage.removeItem('simkl_user');
     }
+
+    // Bulk sync all local lists to Simkl
+    async syncAllToSimkl(wantToWatch: MediaItem[], watched: MediaItem[]): Promise<{ success: boolean; synced: number }> {
+        if (!this.accessToken) return { success: false, synced: 0 };
+
+        let syncedCount = 0;
+
+        try {
+            // Sync want to watch list
+            for (const item of wantToWatch) {
+                const success = await this.addToList(item, 'watchlist');
+                if (success) syncedCount++;
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            // Sync watched list
+            for (const item of watched) {
+                const success = await this.addToList(item, 'watched');
+                if (success) syncedCount++;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            return { success: true, synced: syncedCount };
+        } catch (error) {
+            console.error('Bulk sync error:', error);
+            return { success: false, synced: syncedCount };
+        }
+    }
 }
 
 export const simklService = new SimklService();
