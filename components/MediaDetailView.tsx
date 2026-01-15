@@ -18,7 +18,7 @@ interface MediaDetailViewProps {
 const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose, onItemClick, onPersonClick, onCollectionClick }) => {
     const [details, setDetails] = useState<MediaDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isWantToWatch, setIsWantToWatch] = useState(storageService.isInList('wantToWatch', item.id));
+    const [isWnttToWatch, setIsWnttToWatch] = useState(storageService.isInList('wnttToWatch', item.id));
     const [isWatched, setIsWatched] = useState(storageService.isInList('watched', item.id));
     const [isLiked, setIsLiked] = useState(storageService.isInList('liked', item.id));
     const [showSyncPrompt, setShowSyncPrompt] = useState(false);
@@ -27,7 +27,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     useEffect(() => {
         setLoading(true);
         setDetails(null);
-        setIsWantToWatch(storageService.isInList('wantToWatch', item.id));
+        setIsWnttToWatch(storageService.isInList('wnttToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
 
@@ -67,7 +67,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(value);
     };
 
-    const handleToggleList = async (type: 'wantToWatch' | 'watched' | 'liked') => {
+    const handleToggleList = async (type: 'planToWatch' | 'watched' | 'liked') => {
         const itemToStore = {
             id: item.id,
             title: item.title,
@@ -83,7 +83,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
         const newState = await storageService.toggleItem(type, itemToStore);
 
-        if (type === 'wantToWatch') setIsWantToWatch(newState);
+        if (type === 'planToWatch') setIsPlanToWatch(newState);
         if (type === 'watched') setIsWatched(newState);
         if (type === 'liked') setIsLiked(newState);
 
@@ -167,11 +167,11 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
                             <div className="flex items-center gap-2">
                                 <button
-                                    onClick={() => handleToggleList('wantToWatch')}
-                                    title="Want to Watch"
-                                    className={`p-4 rounded-full border transition-all ${isWantToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                                    onClick={() => handleToggleList('planToWatch')}
+                                    title="Plan to Watch"
+                                    className={`p-4 rounded-full border transition-all ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
                                 >
-                                    <Plus size={20} className={isWantToWatch ? 'rotate-45 transition-transform' : ''} />
+                                    <Plus size={20} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
                                 </button>
                                 <button
                                     onClick={() => handleToggleList('watched')}

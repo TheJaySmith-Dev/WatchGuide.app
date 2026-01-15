@@ -1,17 +1,17 @@
 import { MediaItem } from '../types';
 import { simklService } from './simkl';
 
-export type ListType = 'wantToWatch' | 'watched' | 'liked';
+export type ListType = 'planToWatch' | 'watched' | 'liked';
 
 // Storage service now uses Simkl as primary data source
 class StorageService {
     private cache: {
-        wantToWatch: MediaItem[];
+        planToWatch: MediaItem[];
         watched: MediaItem[];
         liked: MediaItem[];
         lastFetch: number;
     } = {
-            wantToWatch: [],
+            planToWatch: [],
             watched: [],
             liked: [],
             lastFetch: 0
@@ -22,7 +22,7 @@ class StorageService {
     // Fetch lists from Simkl
     async fetchLists(): Promise<void> {
         if (!simklService.isAuthenticated()) {
-            this.cache = { wantToWatch: [], watched: [], liked: [], lastFetch: 0 };
+            this.cache = { planToWatch: [], watched: [], liked: [], lastFetch: 0 };
             return;
         }
 
@@ -33,9 +33,9 @@ class StorageService {
             ]);
 
             // Convert Simkl items to MediaItems
-            this.cache.wantToWatch = await simklService.convertToMediaItems(watchlistItems);
+            this.cache.planToWatch = await simklService.convertToMediaItems(watchlistItems);
             this.cache.watched = await simklService.convertToMediaItems(watchedItems);
-            this.cache.liked = []; // Simkl doesn't have a separate "liked" list
+            this.cache.liked = await simklService.convertToMediaItems(ratedItems);[]; // Simkl doesn't have a separate "liked" list
             this.cache.lastFetch = Date.now();
         } catch (error) {
             console.error('Failed to fetch lists from Simkl:', error);
@@ -69,7 +69,7 @@ class StorageService {
 
         // Update Simkl
         let success = false;
-        if (type === 'wantToWatch') {
+        if (type === 'planToWatch') {
             success = isAdding
                 ? await simklService.addToList(item, 'watchlist')
                 : await simklService.removeFromList(item, 'watchlist');

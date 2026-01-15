@@ -6,20 +6,26 @@ import { simklService } from '../services/simkl';
 import { Trash2, Film, Tv, Heart, ChevronRight } from 'lucide-react';
 
 const MyList: React.FC = () => {
-    const [activeList, setActiveList] = useState<'wantToWatch' | 'watched' | 'liked'>('wantToWatch');
-    const [lists, setLists] = useState<{ wantToWatch: MediaItem[], watched: MediaItem[], liked: MediaItem[] }>({
-        wantToWatch: [],
+    const [activeList, setActiveList] = useState<'planToWatch' | 'watched' | 'liked'>('planToWatch');
+    const [lists, setLists] = useState<{ planToWatch: MediaItem[], watched: MediaItem[], liked: MediaItem[] }>({
+        planToWatch: [],
         watched: [],
         liked: []
     });
     const [loading, setLoading] = useState(true);
 
+    const [simklUser, setSimklUser] = useState<any>(null);
+
     useEffect(() => {
         const loadLists = async () => {
             if (simklService.isAuthenticated()) {
+                // Load user info for profile link
+                const user = await simklService.getCurrentUser();
+                setSimklUser(user);
+                
                 await storageService.refresh();
                 setLists({
-                    wantToWatch: storageService.getListSync('wantToWatch'),
+                    planToWatch: storageService.getListSync('planToWatch'),
                     watched: storageService.getListSync('watched'),
                     liked: storageService.getListSync('liked')
                 });
@@ -29,6 +35,23 @@ const MyList: React.FC = () => {
         loadLists();
     }, []);
 
+    const openSimklProfile = () => {
+        if (simklUser?.user?.name) {
+            // Map internal list types to Simkl URL segments
+            // watchlist -> plan-to-watch
+            // watched -> completed
+            // liked -> all (or just dashboard)
+            let segment = 'dashboard';
+            if (activeList === 'planToWatch') segment = 'plan-to-watch';
+            else if (activeList === 'watched') segment = 'completed';
+            else if (activeList === 'liked') segment = 'all'; // Ratings usually in all or dashboard
+            
+            window.open(`https://simkl.com/u/${simklUser.user.name}/${segment}`, '_blank');
+        } else {
+            window.open('https://simkl.com/dashboard', '_blank');
+        }
+    };
+
     const currentList = lists[activeList];
 
     const handleRemove = async (item: MediaItem) => {
@@ -36,7 +59,7 @@ const MyList: React.FC = () => {
         // Refresh lists
         await storageService.refresh();
         setLists({
-            wantToWatch: storageService.getListSync('wantToWatch'),
+            planToWatch: storageService.getListSync('planToWatch'),
             watched: storageService.getListSync('watched'),
             liked: storageService.getListSync('liked')
         });

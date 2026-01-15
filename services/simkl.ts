@@ -302,14 +302,14 @@ class SimklService {
     }
 
     // Bulk sync all local lists to Simkl
-    async syncAllToSimkl(wantToWatch: MediaItem[], watched: MediaItem[]): Promise<{ success: boolean; synced: number }> {
+    async syncAllToSimkl(planToWatch: MediaItem[], watched: MediaItem[]): Promise<{ success: boolean; synced: number }> {
         if (!this.accessToken) return { success: false, synced: 0 };
 
         let syncedCount = 0;
 
         try {
-            // Sync want to watch list
-            for (const item of wantToWatch) {
+            // Sync plan to watch list
+            for (const item of planToWatch) {
                 const success = await this.addToList(item, 'watchlist');
                 if (success) syncedCount++;
                 // Small delay to avoid rate limiting
