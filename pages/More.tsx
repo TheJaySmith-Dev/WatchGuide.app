@@ -180,13 +180,30 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <ChevronRight size={16} />
                         </div>
                     </div>
-                    <div className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors">
+                    <a
+                        href="/pricing"
+                        className="flex items-center justify-between p-4 border-t border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gray-500/20 rounded-lg text-gray-400"><Settings size={20} /></div>
-                            <span className="text-white">Preferences</span>
+                            <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400">
+                                <Crown size={20} />
+                            </div>
+                            <span className="text-white">Pricing</span>
                         </div>
                         <ChevronRight size={16} className="text-gray-400" />
-                    </div>
+                    </a>
+                    <a
+                        href="/tos"
+                        className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-500/20 rounded-lg text-gray-400">
+                                <Settings size={20} />
+                            </div>
+                            <span className="text-white">Terms of Service</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </a>
                 </div>
             </div>
 
