@@ -18,7 +18,7 @@ interface MediaDetailViewProps {
 const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose, onItemClick, onPersonClick, onCollectionClick }) => {
     const [details, setDetails] = useState<MediaDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isWnttToWatch, setIsWnttToWatch] = useState(storageService.isInList('wnttToWatch', item.id));
+    const [isPlanToWatch, setIsPlanToWatch] = useState(storageService.isInList('planToWatch', item.id));
     const [isWatched, setIsWatched] = useState(storageService.isInList('watched', item.id));
     const [isLiked, setIsLiked] = useState(storageService.isInList('liked', item.id));
     const [showSyncPrompt, setShowSyncPrompt] = useState(false);
@@ -27,7 +27,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     useEffect(() => {
         setLoading(true);
         setDetails(null);
-        setIsWnttToWatch(storageService.isInList('wnttToWatch', item.id));
+        setIsPlanToWatch(storageService.isInList('planToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
 

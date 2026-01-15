@@ -27,15 +27,16 @@ class StorageService {
         }
 
         try {
-            const [watchlistItems, watchedItems] = await Promise.all([
+            const [watchlistItems, watchedItems, ratedItems] = await Promise.all([
                 simklService.getWatchlist(),
-                simklService.getWatched()
+                simklService.getWatched(),
+                simklService.getRatings()
             ]);
 
             // Convert Simkl items to MediaItems
             this.cache.planToWatch = await simklService.convertToMediaItems(watchlistItems);
             this.cache.watched = await simklService.convertToMediaItems(watchedItems);
-            this.cache.liked = await simklService.convertToMediaItems(ratedItems);[]; // Simkl doesn't have a separate "liked" list
+            this.cache.liked = await simklService.convertToMediaItems(ratedItems);
             this.cache.lastFetch = Date.now();
         } catch (error) {
             console.error('Failed to fetch lists from Simkl:', error);
@@ -99,6 +100,10 @@ class StorageService {
 
     // Check if item is in list
     isInList(type: ListType, id: number): boolean {
+        if (!this.cache[type]) {
+            console.error(`Invalid list type: ${type}`);
+            return false;
+        }
         return this.cache[type].some(i => i.id === id);
     }
 

@@ -79,16 +79,16 @@ const MyList: React.FC = () => {
             {/* List Selector Tabs */}
             <div className="flex gap-2 mb-8 overflow-x-auto hide-scrollbar">
                 <button
-                    onClick={() => setActiveList('wantToWatch')}
-                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${activeList === 'wantToWatch'
+                    onClick={() => setActiveList('planToWatch')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${activeList === 'planToWatch'
                         ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
                         : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                         }`}
                 >
                     <Film size={18} />
-                    <span>Want to Watch</span>
-                    {lists.wantToWatch.length > 0 && (
-                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">{lists.wantToWatch.length}</span>
+                    <span>Plan to Watch</span>
+                    {lists.planToWatch.length > 0 && (
+                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">{lists.planToWatch.length}</span>
                     )}
                 </button>
                 <button
