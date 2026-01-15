@@ -34,9 +34,11 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
     );
   }
 
-  // Filter and sort credits
+  // Filter and sort credits, ensuring unique items by ID and media_type
   const castCredits = person.combined_credits?.cast || [];
-  const sortedCredits = [...castCredits]
+  const uniqueCredits = Array.from(new Map(castCredits.map(item => [`${item.id}-${item.media_type}`, item])).values());
+  
+  const sortedCredits = uniqueCredits
     .filter(item => item.poster_path && item.vote_average && item.vote_average > 0)
     .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0)); // Sort by rating for "Known For" feel
 
@@ -52,8 +54,8 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
       <div className="w-full h-full md:max-w-6xl md:h-[90vh] bg-black/40 md:rounded-3xl overflow-y-auto shadow-2xl relative border border-white/10 flex flex-col md:flex-row backdrop-blur-sm">
         
         {/* Sidebar Info */}
-        <div className="w-full md:w-1/3 p-8 md:p-12 border-b md:border-b-0 md:border-r border-white/10 bg-black/20">
-            <div className="w-48 h-48 md:w-64 md:h-64 rounded-2xl overflow-hidden shadow-2xl mb-8 mx-auto md:mx-0">
+        <div className="w-full md:w-1/3 p-8 md:p-12 border-b md:border-b-0 md:border-r border-white/10 bg-black/20 flex flex-col items-center md:items-start shrink-0">
+            <div className="w-48 h-48 md:w-64 md:h-64 rounded-2xl overflow-hidden shadow-2xl mb-8 border border-white/10 shrink-0">
                 <img 
                     src={getImageUrl(person.profile_path, 'w500')} 
                     alt={person.name} 

@@ -58,9 +58,7 @@ export const getImageUrl = (path: string | null, size: 'w500' | 'original' = 'w5
 // --- FanArt Integration ---
 export const getFanArtLogo = async (type: 'movie' | 'tv', tmdbId: number): Promise<string | null> => {
   try {
-    const response = await fetch(`${BASE_URL}/${type}/${tmdbId}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null`);
-    if (!response.ok) return null;
-    const data = await response.json();
+    const data = await fetchTMDB<any>(`/${type}/${tmdbId}/images`, { include_image_language: 'en,null' });
     const logo = data.logos?.find((l: any) => l.iso_639_1 === 'en') || data.logos?.[0];
     return logo ? `${IMAGE_BASE_URL}/original${logo.file_path}` : null;
   } catch (e) {
@@ -94,9 +92,12 @@ export const getTrending = async (): Promise<MediaItem[]> => {
   }
 };
 
-export const getMovies = async (category: 'popular' | 'top_rated' | 'upcoming' | 'now_playing'): Promise<MediaItem[]> => {
+export const getMovies = async (category: 'popular' | 'top_rated' | 'upcoming' | 'now_playing', region?: string): Promise<MediaItem[]> => {
   try {
-    const data = await fetchTMDB<{ results: MediaItem[] }>(`/movie/${category}`);
+    const params: Record<string, string> = {};
+    if (region) params.region = region;
+    
+    const data = await fetchTMDB<{ results: MediaItem[] }>(`/movie/${category}`, params);
     const results = (data.results || []).map(item => ({ ...item, media_type: 'movie' as const }));
     return results.length > 0 ? results : FALLBACK_DATA.filter(i => i.media_type === 'movie');
   } catch (e) {

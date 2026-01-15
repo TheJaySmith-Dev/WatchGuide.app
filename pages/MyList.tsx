@@ -5,7 +5,11 @@ import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { Trash2, Film, Tv, Heart, ChevronRight } from 'lucide-react';
 
-const MyList: React.FC = () => {
+interface MyListProps {
+    onItemClick?: (item: MediaItem) => void;
+}
+
+const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
     const [activeList, setActiveList] = useState<'planToWatch' | 'watched' | 'liked'>('planToWatch');
     const [lists, setLists] = useState<{ planToWatch: MediaItem[], watched: MediaItem[], liked: MediaItem[] }>({
         planToWatch: [],
@@ -136,7 +140,8 @@ const MyList: React.FC = () => {
                     {currentList.map(item => (
                         <div
                             key={item.id}
-                            className="group relative bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-all"
+                            className="group relative bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-all cursor-pointer"
+                            onClick={() => onItemClick && onItemClick(item)}
                         >
                             <img
                                 src={getImageUrl(item.poster_path, 'w500')}

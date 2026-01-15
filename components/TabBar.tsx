@@ -10,7 +10,6 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
   const tabs = [
     { id: 'browse', label: 'Browse', icon: Home },
     { id: 'mylist', label: 'My List', icon: Bookmark },
-    { id: 'calendar', label: 'Calendar', icon: Calendar },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'more', label: 'More', icon: Menu },
   ];

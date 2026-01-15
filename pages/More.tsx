@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import GuideAIBot from '../components/GuideAIBot';
@@ -11,6 +11,7 @@ interface MoreProps {
     currentRegion: string;
     onRegionChange: (region: string) => void;
     simklUser?: any;
+    onCountdownClick?: () => void;
 }
 
 const regions = [
@@ -30,7 +31,7 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, onCountdownClick }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
 
@@ -51,6 +52,25 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
             {/* Subscriptions */}
             {/* Removed per user request */}
+
+            {/* Features Section */}
+            <div className="max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Features</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                    <button
+                        onClick={onCountdownClick}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                                <Timer size={20} />
+                            </div>
+                            <span className="text-white">Release Countdown</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
+                </div>
+            </div>
 
             {/* Cloud Sync Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">

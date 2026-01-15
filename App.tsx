@@ -4,7 +4,7 @@ import Browse from './pages/Browse';
 import Search from './pages/Search';
 import More from './pages/More';
 import MyList from './pages/MyList';
-import Calendar from './pages/Calendar';
+import Countdown from './pages/Countdown';
 import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
@@ -20,6 +20,26 @@ const App: React.FC = () => {
   const [region, setRegion] = useState('US');
   const [simklUser, setSimklUser] = useState<SimklUser | null>(null);
 
+  // Simple Hash Router Implementation
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace('#/', '') || 'browse';
+      setActiveTab(hash);
+    };
+
+    // Set initial tab based on hash
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  const handleTabChange = (tab: string) => {
+    window.location.hash = `#/${tab}`;
+    setActiveTab(tab);
+  };
+
   useEffect(() => {
     // Handle Simkl OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
@@ -30,8 +50,9 @@ const App: React.FC = () => {
         if (success) {
           simklService.getCurrentUser().then(user => {
             setSimklUser(user);
-            // Clean up URL
-            window.history.replaceState({}, document.title, window.location.pathname);
+            // Clean up URL but preserve hash if present, or default to current tab
+            const currentHash = window.location.hash || `#/${activeTab}`;
+            window.history.replaceState({}, document.title, window.location.pathname + currentHash);
           });
         }
       });
@@ -67,8 +88,8 @@ const App: React.FC = () => {
         return <Browse onItemClick={handleMediaClick} />;
       case 'mylist':
         return <MyList onItemClick={handleMediaClick} />;
-      case 'calendar':
-        return <Calendar onItemClick={handleMediaClick} />;
+      case 'countdown':
+        return <Countdown onItemClick={handleMediaClick} region={region} />;
       case 'search':
         return <Search onItemClick={(item) => {
           if (item.media_type === 'person') {
@@ -84,6 +105,7 @@ const App: React.FC = () => {
             currentRegion={region}
             onRegionChange={setRegion}
             simklUser={simklUser}
+            onCountdownClick={() => handleTabChange('countdown')}
           />
         );
       default:
@@ -100,7 +122,7 @@ const App: React.FC = () => {
       </main>
 
       {/* Navigation */}
-      <TabBar activeTab={activeTab} onTabChange={setActiveTab} />
+      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
 
       {/* Media Detail Overlay */}
       {selectedItem && (
