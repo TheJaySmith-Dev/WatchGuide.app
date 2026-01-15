@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import GuideAIBot from '../components/GuideAIBot';
+import Paywall from '../components/Paywall';
+import { revenuecatService } from '../services/revenuecat';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -33,12 +35,30 @@ const regions = [
 const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
+    const [showPaywall, setShowPaywall] = useState(false);
+    const [customerInfo, setCustomerInfo] = useState<any | null>(null);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
     }, []);
 
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoadingSubscription(true);
+                await revenuecatService.init();
+                const info = await revenuecatService.getCustomerInfo();
+                setCustomerInfo(info);
+            } catch {
+                setCustomerInfo(null);
+            } finally {
+                setLoadingSubscription(false);
+            }
+        };
+        load();
+    }, []);
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
@@ -47,6 +67,53 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
                 <GuideAIBot isMobileInline={true} />
+            </div>
+
+            {/* Subscriptions */}
+            <div className="max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Subscriptions</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400"><Crown size={20} /></div>
+                            <div>
+                                <div className="text-white font-medium">Watch Guide Premium</div>
+                                <div className="text-gray-400 text-sm">
+                                    {loadingSubscription ? 'Loading...' : (customerInfo ? 'Status loaded' : 'Not subscribed')}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowPaywall(true)}
+                                className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-300 text-sm font-medium"
+                            >
+                                Subscribe
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setLoadingSubscription(true);
+                                    try {
+                                        const info = await revenuecatService.restorePurchases();
+                                        setCustomerInfo(info);
+                                    } finally {
+                                        setLoadingSubscription(false);
+                                    }
+                                }}
+                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-xl hover:bg-white/15 transition-all text-white/80 text-sm font-medium flex items-center gap-2"
+                            >
+                                <RefreshCw size={16} />
+                                Restore
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => revenuecatService.openCustomerCenter()}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl hover:bg-white/15 transition-all text-white/80 text-sm font-medium"
+                    >
+                        Manage Subscription
+                    </button>
+                </div>
             </div>
 
             {/* Cloud Sync Section */}
@@ -187,6 +254,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                     ))}
                 </div>
             </div>
+            {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
         </div>
     );
 };
