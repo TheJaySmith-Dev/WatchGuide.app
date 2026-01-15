@@ -220,6 +220,53 @@ class SimklService {
         }
     }
 
+    // Get calendar data from Simkl (Premieres only)
+    async getCalendar(): Promise<MediaItem[]> {
+        if (!this.accessToken) return [];
+
+        try {
+            // Fetch premieres for the next 30 days
+            const response = await fetch(`${SIMKL_API_BASE}/calendars/premieres?days=30`, {
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'simkl-api-key': SIMKL_CLIENT_ID,
+                },
+            });
+
+            if (!response.ok) return [];
+
+            const data = await response.json();
+            const simklItems: SimklListItem[] = [];
+            
+            // Simkl calendar returns array of objects with 'date' and 'episodes'/'movies'
+            data.forEach((day: any) => {
+                if (day.movies) {
+                    day.movies.forEach((m: any) => {
+                        simklItems.push({
+                            title: m.title,
+                            year: m.year,
+                            ids: m.ids
+                        });
+                    });
+                }
+                if (day.episodes) {
+                     day.episodes.forEach((e: any) => {
+                        simklItems.push({
+                            title: e.show.title,
+                            year: e.show.year,
+                            ids: e.show.ids
+                        });
+                     });
+                }
+            });
+
+            return await this.convertToMediaItems(simklItems);
+        } catch (error) {
+            console.error('Get calendar error:', error);
+            return [];
+        }
+    }
+
     // Check if user is logged in
     isAuthenticated(): boolean {
         return this.accessToken !== null;

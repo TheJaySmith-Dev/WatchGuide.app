@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { getMovies, getTVShows, getImageUrl } from '../services/api';
+import { simklService } from '../services/simkl';
 import { MediaItem } from '../types';
-import { Calendar as CalendarIcon, ChevronRight, Clock, Tv, Film } from 'lucide-react';
+import { Calendar as CalendarIcon, ChevronRight, Clock, Tv, Film, Info } from 'lucide-react';
 
 interface CalendarProps {
     onItemClick: (item: MediaItem) => void;
@@ -53,10 +54,35 @@ const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate }) => {
 const Calendar: React.FC<CalendarProps> = ({ onItemClick }) => {
     const [upcoming, setUpcoming] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isSimklData, setIsSimklData] = useState(false);
 
     useEffect(() => {
         const fetchCalendarData = async () => {
             try {
+                // Try to fetch from Simkl first if authenticated
+                if (simklService.isAuthenticated()) {
+                    const simklData = await simklService.getCalendar();
+                    if (simklData.length > 0) {
+                        // Filter for future dates
+                        const now = new Date();
+                        const sorted = simklData
+                            .filter(item => {
+                                const dateStr = item.release_date || item.first_air_date;
+                                return dateStr && new Date(dateStr) >= now;
+                            })
+                            .sort((a, b) => {
+                                const dateA = a.release_date || a.first_air_date || '';
+                                const dateB = b.release_date || b.first_air_date || '';
+                                return new Date(dateA).getTime() - new Date(dateB).getTime();
+                            });
+                            
+                        setUpcoming(sorted);
+                        setIsSimklData(true);
+                        setLoading(false);
+                        return;
+                    }
+                }
+
                 const [movies, tv] = await Promise.all([
                     getMovies('upcoming'),
                     getTVShows('on_the_air')
@@ -72,6 +98,7 @@ const Calendar: React.FC<CalendarProps> = ({ onItemClick }) => {
                     .sort((a, b) => new Date(a.release_date!).getTime() - new Date(b.release_date!).getTime());
 
                 setUpcoming(combined.slice(0, 15));
+                setIsSimklData(false);
             } catch (error) {
                 console.error("Failed to fetch calendar data", error);
             } finally {
@@ -104,6 +131,12 @@ const Calendar: React.FC<CalendarProps> = ({ onItemClick }) => {
                     Release Calendar
                 </h1>
                 <p className="text-gray-400 mt-2">Upcoming theatrical and streaming premieres</p>
+                {!isSimklData && !loading && (
+                    <div className="flex items-center gap-2 mt-4 text-xs text-yellow-500 bg-yellow-500/10 px-3 py-2 rounded-lg w-fit">
+                        <Info size={14} />
+                        <span>Log in to Simkl for personalized calendar</span>
+                    </div>
+                )}
             </header>
 
             <div className="max-w-4xl space-y-8 relative before:absolute before:left-4 md:before:left-6 before:top-2 before:bottom-0 before:w-px before:bg-white/10">

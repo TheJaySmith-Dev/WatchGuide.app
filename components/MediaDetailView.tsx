@@ -48,9 +48,30 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     // Extract Data
     const trailer = details?.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
 
-    // Region Logic: Mirror UK (GB) content for South Africa (ZA) if requested, otherwise use selected region
-    const providerRegionKey = region === 'ZA' ? 'GB' : region;
-    const providers = details?.['watch/providers']?.results?.[providerRegionKey];
+    // Region Logic: Handle ZA specifically to mix local availability with UK's Disney+
+    let providers = details?.['watch/providers']?.results?.[region];
+    
+    // Special case for South Africa (ZA): Use local data but pull Disney+ from UK (GB)
+    if (region === 'ZA') {
+        const zaProviders = details?.['watch/providers']?.results?.['ZA'];
+        const gbProviders = details?.['watch/providers']?.results?.['GB'];
+        
+        // Start with ZA providers
+        providers = zaProviders || { link: '', flatrate: [], rent: [], buy: [] };
+        
+        // Check if Disney+ is in GB providers
+        const disneyPlusGB = gbProviders?.flatrate?.find(p => p.provider_name.includes('Disney'));
+        
+        if (disneyPlusGB) {
+            // Initialize flatrate if it doesn't exist
+            if (!providers.flatrate) providers.flatrate = [];
+            
+            // Add Disney+ if not already present
+            if (!providers.flatrate.some(p => p.provider_name.includes('Disney'))) {
+                providers.flatrate = [...providers.flatrate, disneyPlusGB];
+            }
+        }
+    }
 
     const flatrate = providers?.flatrate || [];
     const rent = providers?.rent || [];
