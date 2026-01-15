@@ -233,32 +233,42 @@ class SimklService {
                 },
             });
 
-            if (!response.ok) return [];
+            if (!response.ok) {
+                console.error('Simkl Calendar API Error:', response.status, await response.text());
+                return [];
+            }
 
             const data = await response.json();
+            console.log('Simkl Calendar Data:', data);
+            
             const simklItems: SimklListItem[] = [];
             
             // Simkl calendar returns array of objects with 'date' and 'episodes'/'movies'
-            data.forEach((day: any) => {
-                if (day.movies) {
-                    day.movies.forEach((m: any) => {
-                        simklItems.push({
-                            title: m.title,
-                            year: m.year,
-                            ids: m.ids
+            // Ensure data is an array before iterating
+            if (Array.isArray(data)) {
+                data.forEach((day: any) => {
+                    if (day.movies) {
+                        day.movies.forEach((m: any) => {
+                            simklItems.push({
+                                title: m.title,
+                                year: m.year,
+                                ids: m.ids
+                            });
                         });
-                    });
-                }
-                if (day.episodes) {
-                     day.episodes.forEach((e: any) => {
-                        simklItems.push({
-                            title: e.show.title,
-                            year: e.show.year,
-                            ids: e.show.ids
-                        });
-                     });
-                }
-            });
+                    }
+                    if (day.episodes) {
+                         day.episodes.forEach((e: any) => {
+                            simklItems.push({
+                                title: e.show.title,
+                                year: e.show.year,
+                                ids: e.show.ids
+                            });
+                         });
+                    }
+                });
+            } else {
+                 console.warn('Simkl Calendar data is not an array:', data);
+            }
 
             return await this.convertToMediaItems(simklItems);
         } catch (error) {
