@@ -67,7 +67,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(value);
     };
 
-    const handleToggleList = (type: 'wantToWatch' | 'watched' | 'liked') => {
+    const handleToggleList = async (type: 'wantToWatch' | 'watched' | 'liked') => {
         const itemToStore = {
             id: item.id,
             title: item.title,
@@ -81,7 +81,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
             first_air_date: item.first_air_date
         };
 
-        const newState = storageService.toggleItem(type, itemToStore);
+        const newState = await storageService.toggleItem(type, itemToStore);
 
         if (type === 'wantToWatch') setIsWantToWatch(newState);
         if (type === 'watched') setIsWatched(newState);
@@ -98,25 +98,8 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-3 ring-2 ring-white/20">
                     <div className="flex items-center gap-2">
                         <Check size={16} />
-                        <span>Updated!</span>
+                        <span>Synced to Simkl!</span>
                     </div>
-                    <div className="w-px h-4 bg-white/20" />
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            const code = storageService.exportData();
-                            const success = await copyToClipboard(code);
-                            if (success) {
-                                alert('Sync Code copied!');
-                            } else {
-                                alert('Failed to copy.');
-                            }
-                        }}
-                        className="hover:text-indigo-200 transition-colors flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20"
-                    >
-                        <Plus size={14} className="rotate-45" />
-                        Copy Sync Code
-                    </button>
                 </div>
             )}
 

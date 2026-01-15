@@ -1,126 +1,138 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
-import { Play, Heart, Check, Clock, ListPlus, Copy, Share2 } from 'lucide-react';
-import { storageService, ListType } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
+import { storageService } from '../services/storage';
+import { simklService } from '../services/simkl';
+import { Trash2, Film, Tv, Heart } from 'lucide-react';
 
-interface MyListProps {
-    onItemClick: (item: MediaItem) => void;
-}
+const MyList: React.FC = () => {
+    const [activeList, setActiveList] = useState<'wantToWatch' | 'watched' | 'liked'>('wantToWatch');
+    const [lists, setLists] = useState<{ wantToWatch: MediaItem[], watched: MediaItem[], liked: MediaItem[] }>({
+        wantToWatch: [],
+        watched: [],
+        liked: []
+    });
+    const [loading, setLoading] = useState(true);
 
-const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
-    const [activeList, setActiveList] = useState<ListType>('wantToWatch');
+    useEffect(() => {
+        const loadLists = async () => {
+            if (simklService.isAuthenticated()) {
+                await storageService.refresh();
+                setLists({
+                    wantToWatch: storageService.getListSync('wantToWatch'),
+                    watched: storageService.getListSync('watched'),
+                    liked: storageService.getListSync('liked')
+                });
+            }
+            setLoading(false);
+        };
+        loadLists();
+    }, []);
 
-    const lists: { id: ListType; label: string; icon: any; color: string }[] = [
-        { id: 'wantToWatch', label: 'Want To Watch', icon: ListPlus, color: 'text-indigo-400' },
-        { id: 'watched', label: 'Watched', icon: Check, color: 'text-green-400' },
-        { id: 'liked', label: 'Liked', icon: Heart, color: 'text-rose-400' }
-    ];
+    const currentList = lists[activeList];
 
-    const currentList = storageService.getList(activeList);
+    const handleRemove = async (item: MediaItem) => {
+        await storageService.toggleItem(activeList, item);
+        // Refresh lists
+        await storageService.refresh();
+        setLists({
+            wantToWatch: storageService.getListSync('wantToWatch'),
+            watched: storageService.getListSync('watched'),
+            liked: storageService.getListSync('liked')
+        });
+    };
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32">
-            <header className="mb-10 flex justify-between items-start">
-                <div>
-                    <h1 className="text-4xl font-black text-white">My Library</h1>
-                    <p className="text-gray-400 mt-2">Privacy-first local storage</p>
-                </div>
-                <div className="flex gap-2">
-                    <button
-                        onClick={async () => {
-                            const code = storageService.exportData();
-                            const success = await copyToClipboard(code);
-                            if (success) {
-                                alert('Sync Code copied! Paste this on another device to sync your data.');
-                            } else {
-                                alert('Failed to copy. Please try again.');
-                            }
-                        }}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600/20 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 hover:text-indigo-300 text-sm font-medium"
-                    >
-                        <Share2 size={16} />
-                        <span>Copy Sync Code</span>
-                    </button>
-                    {currentList.length > 0 && (
-                        <button
-                            onClick={async () => {
-                                const items = storageService.getList(activeList);
-                                const listText = items.map(item => `- ${item.title || item.name} (${item.media_type})`).join('\n');
-                                const header = `My ${activeList.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())} List:\n\n`;
-
-                                const success = await copyToClipboard(header + listText);
-                                if (success) {
-                                    alert('List copied to clipboard as text!');
-                                } else {
-                                    alert('Failed to copy. Please try again.');
-                                }
-                            }}
-                            className="flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-gray-400 hover:text-white text-sm font-medium"
-                        >
-                            <Copy size={16} />
-                            <span>Copy List</span>
-                        </button>
-                    )}
-                </div>
+            <header className="mb-10">
+                <h1 className="text-4xl font-black text-white">My Library</h1>
+                <p className="text-gray-400 mt-2">
+                    {simklService.isAuthenticated()
+                        ? 'Synced with Simkl'
+                        : 'Please log in to Simkl to view your lists'}
+                </p>
             </header>
 
             {/* List Selector Tabs */}
-            <div className="flex gap-2 mb-8 overflow-x-auto pb-2 hide-scrollbar">
-                {lists.map(list => {
-                    const Icon = list.icon;
-                    const isActive = activeList === list.id;
-                    return (
-                        <button
-                            key={list.id}
-                            onClick={() => setActiveList(list.id)}
-                            className={`flex items-center gap-2 px-6 py-3 rounded-full border transition-all shrink-0 font-medium ${isActive
-                                ? 'bg-white/10 border-white/20 text-white shadow-xl'
-                                : 'bg-transparent border-transparent text-gray-500 hover:text-gray-300'
-                                }`}
-                        >
-                            <Icon size={18} className={isActive ? list.color : ''} fill={isActive && list.id === 'liked' ? 'currentColor' : 'none'} />
-                            <span>{list.label}</span>
-                            <span className={`text-xs px-2 py-0.5 rounded-full ${isActive ? 'bg-white/10 text-white' : 'bg-white/5 text-gray-600'}`}>
-                                {storageService.getList(list.id).length}
-                            </span>
-                        </button>
-                    );
-                })}
+            <div className="flex gap-2 mb-8 overflow-x-auto hide-scrollbar">
+                <button
+                    onClick={() => setActiveList('wantToWatch')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${activeList === 'wantToWatch'
+                        ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                >
+                    <Film size={18} />
+                    <span>Want to Watch</span>
+                    {lists.wantToWatch.length > 0 && (
+                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">{lists.wantToWatch.length}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveList('watched')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${activeList === 'watched'
+                        ? 'bg-green-600 text-white shadow-lg shadow-green-600/30'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                >
+                    <Tv size={18} />
+                    <span>Watched</span>
+                    {lists.watched.length > 0 && (
+                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">{lists.watched.length}</span>
+                    )}
+                </button>
+                <button
+                    onClick={() => setActiveList('liked')}
+                    className={`flex items-center gap-2 px-6 py-3 rounded-xl font-medium transition-all whitespace-nowrap ${activeList === 'liked'
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
+                        }`}
+                >
+                    <Heart size={18} />
+                    <span>Liked</span>
+                    {lists.liked.length > 0 && (
+                        <span className="px-2 py-0.5 bg-white/20 rounded-full text-xs">{lists.liked.length}</span>
+                    )}
+                </button>
             </div>
 
-            {currentList.length === 0 ? (
-                <div className="bg-white/5 border border-white/10 rounded-3xl p-12 text-center">
-                    <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4 border border-white/10">
-                        <Clock size={32} className="text-gray-600" />
-                    </div>
-                    <h3 className="text-white font-bold text-lg mb-1">Your list is empty</h3>
-                    <p className="text-gray-500 max-w-sm mx-auto">Add titles from Browse or Search to start buildling your local library.</p>
+            {/* Content Grid */}
+            {loading ? (
+                <div className="text-center text-gray-400 py-20">Loading...</div>
+            ) : !simklService.isAuthenticated() ? (
+                <div className="text-center text-gray-400 py-20">
+                    <p>Please log in to Simkl from the More tab to view your lists</p>
+                </div>
+            ) : currentList.length === 0 ? (
+                <div className="text-center text-gray-400 py-20">
+                    <p>No items in this list yet</p>
+                    <p className="text-sm mt-2">Add items from the Browse or Search pages</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
-                    {currentList.map((item) => (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {currentList.map(item => (
                         <div
                             key={item.id}
-                            onClick={() => onItemClick(item)}
-                            className="group cursor-pointer space-y-3 animate-fade-in"
+                            className="group relative bg-white/5 rounded-xl overflow-hidden hover:bg-white/10 transition-all"
                         >
-                            <div className="aspect-[2/3] rounded-2xl overflow-hidden relative border border-white/10 shadow-lg">
-                                <img
-                                    src={getImageUrl(item.poster_path)}
-                                    alt={item.title || item.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
-                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center text-black transform scale-0 group-hover:scale-100 transition-transform duration-300">
-                                        <Play size={24} fill="currentColor" />
-                                    </div>
-                                </div>
-                            </div>
-                            <div>
-                                <h3 className="text-white font-medium text-sm truncate">{item.title || item.name}</h3>
-                                <p className="text-gray-500 text-xs uppercase tracking-wider">{item.media_type}</p>
+                            <img
+                                src={getImageUrl(item.poster_path, 'w500')}
+                                alt={item.title || item.name}
+                                className="w-full aspect-[2/3] object-cover"
+                            />
+                            <button
+                                onClick={() => handleRemove(item)}
+                                className="absolute top-2 right-2 p-2 bg-rose-600/90 hover:bg-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <Trash2 size={16} className="text-white" />
+                            </button>
+                            <div className="p-3">
+                                <h3 className="text-sm font-medium text-white line-clamp-2">
+                                    {item.title || item.name}
+                                </h3>
+                                <p className="text-xs text-gray-400 mt-1">
+                                    {item.media_type === 'movie' ? 'Movie' : 'TV Show'}
+                                </p>
                             </div>
                         </div>
                     ))}

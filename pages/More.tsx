@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw } from 'lucide-react';
 import { storageService } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
 import { simklService } from '../services/simkl';
 import GuideAIBot from '../components/GuideAIBot';
+import Paywall from '../components/Paywall';
+import { revenuecatService } from '../services/revenuecat';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -34,14 +35,30 @@ const regions = [
 const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
-    const [simklSyncEnabled, setSimklSyncEnabled] = useState(storageService.isSimklSyncEnabled());
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [showPaywall, setShowPaywall] = useState(false);
+    const [customerInfo, setCustomerInfo] = useState<any | null>(null);
+    const [loadingSubscription, setLoadingSubscription] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
     }, []);
 
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
+    useEffect(() => {
+        const load = async () => {
+            try {
+                setLoadingSubscription(true);
+                await revenuecatService.init();
+                const info = await revenuecatService.getCustomerInfo();
+                setCustomerInfo(info);
+            } catch {
+                setCustomerInfo(null);
+            } finally {
+                setLoadingSubscription(false);
+            }
+        };
+        load();
+    }, []);
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
@@ -50,6 +67,53 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
                 <GuideAIBot isMobileInline={true} />
+            </div>
+
+            {/* Subscriptions */}
+            <div className="max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Subscriptions</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-yellow-500/20 rounded-lg text-yellow-400"><Crown size={20} /></div>
+                            <div>
+                                <div className="text-white font-medium">Watch Guide Premium</div>
+                                <div className="text-gray-400 text-sm">
+                                    {loadingSubscription ? 'Loading...' : (customerInfo ? 'Status loaded' : 'Not subscribed')}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => setShowPaywall(true)}
+                                className="px-3 py-2 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-300 text-sm font-medium"
+                            >
+                                Subscribe
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    setLoadingSubscription(true);
+                                    try {
+                                        const info = await revenuecatService.restorePurchases();
+                                        setCustomerInfo(info);
+                                    } finally {
+                                        setLoadingSubscription(false);
+                                    }
+                                }}
+                                className="px-3 py-2 bg-white/10 border border-white/20 rounded-xl hover:bg-white/15 transition-all text-white/80 text-sm font-medium flex items-center gap-2"
+                            >
+                                <RefreshCw size={16} />
+                                Restore
+                            </button>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => revenuecatService.openCustomerCenter()}
+                        className="w-full px-4 py-2 bg-white/10 border border-white/20 rounded-xl hover:bg-white/15 transition-all text-white/80 text-sm font-medium"
+                    >
+                        Manage Subscription
+                    </button>
+                </div>
             </div>
 
             {/* Cloud Sync Section */}
@@ -78,60 +142,9 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                     Logout
                                 </button>
                             </div>
-
-                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                                <div>
-                                    <p className="text-white font-medium">Automatic Cloud Sync</p>
-                                    <p className="text-gray-400 text-xs mt-1">
-                                        {simklSyncEnabled ? 'Changes sync automatically' : 'Sync manually when needed'}
-                                    </p>
-                                </div>
-                                <button
-                                    onClick={() => {
-                                        const newState = !simklSyncEnabled;
-                                        storageService.setSimklSyncEnabled(newState);
-                                        setSimklSyncEnabled(newState);
-                                    }}
-                                    className={`relative w-14 h-8 rounded-full transition-colors ${simklSyncEnabled ? 'bg-indigo-600' : 'bg-gray-600'
-                                        }`}
-                                >
-                                    <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${simklSyncEnabled ? 'translate-x-6' : 'translate-x-0'
-                                        }`} />
-                                </button>
-                            </div>
-
-                            {storageService.getLastSimklSync() && (
-                                <p className="text-gray-500 text-xs text-center">
-                                    Last synced: {new Date(storageService.getLastSimklSync()!).toLocaleString()}
-                                </p>
-                            )}
-
-                            <button
-                                onClick={async () => {
-                                    setIsSyncing(true);
-                                    const wantToWatch = storageService.getList('wantToWatch');
-                                    const watched = storageService.getList('watched');
-                                    const result = await simklService.syncAllToSimkl(wantToWatch, watched);
-                                    setIsSyncing(false);
-                                    if (result.success) {
-                                        storageService.updateLastSimklSync();
-                                        alert(`Successfully synced ${result.synced} items to Simkl!`);
-                                    } else {
-                                        alert('Failed to sync some items. Please try again.');
-                                    }
-                                }}
-                                disabled={isSyncing}
-                                className="w-full flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white text-sm font-medium disabled:opacity-50"
-                            >
-                                {isSyncing ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                        <span>Syncing...</span>
-                                    </>
-                                ) : (
-                                    <span>Sync All Lists to Simkl</span>
-                                )}
-                            </button>
+                            <p className="text-gray-400 text-sm text-center">
+                                All your watchlists are automatically synced with Simkl
+                            </p>
                         </>
                     ) : (
                         <>
@@ -148,70 +161,6 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                         </>
                     )}
                 </div>
-            </div>
-
-            {/* Manual Sync Section */}
-            <div className="max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Manual Sync</h2>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
-                    <p className="text-gray-400 text-sm">
-                        Privacy first: Your watchlists are stored only on this device.
-                        To sync with another device, copy your sync code and paste it there.
-                    </p>
-
-                    <div className="flex flex-col gap-4">
-                        <button
-                            onClick={async () => {
-                                const code = storageService.exportData();
-                                const success = await copyToClipboard(code);
-                                if (success) {
-                                    alert('Sync code copied to clipboard!');
-                                } else {
-                                    alert('Failed to copy. Please try again.');
-                                }
-                            }}
-                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
-                        >
-                            <span>Copy Sync Code</span>
-                            <ChevronRight size={18} />
-                        </button>
-
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Import from another device</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Paste sync code here..."
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const code = (e.currentTarget as HTMLInputElement).value;
-                                            if (storageService.importData(code)) {
-                                                alert('Data imported successfully! Refreshing...');
-                                                window.location.reload();
-                                            } else {
-                                                alert('Invalid sync code.');
-                                            }
-                                        }
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <button
-                    onClick={() => {
-                        if (confirm('Are you sure you want to delete all local watchlists? This cannot be undone.')) {
-                            localStorage.removeItem('watchguide_user_data');
-                            window.location.reload();
-                        }
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-rose-600/10 border border-rose-500/20 rounded-xl hover:bg-rose-600/20 transition-all text-rose-400 text-xs font-bold uppercase tracking-widest mt-4"
-                >
-                    <span>Reset All Local Data</span>
-                    <X size={14} />
-                </button>
             </div>
 
             {/* Settings Section */}
@@ -305,6 +254,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                     ))}
                 </div>
             </div>
+            {showPaywall && <Paywall onClose={() => setShowPaywall(false)} />}
         </div>
     );
 };
