@@ -78,10 +78,10 @@ class StorageService {
                 ? await simklService.addToList(item, 'watched')
                 : await simklService.removeFromList(item, 'watched');
         } else if (type === 'liked') {
-            // For liked, we'll use watchlist as fallback
+            // For liked, we use ratings (10/10)
             success = isAdding
-                ? await simklService.addToList(item, 'watchlist')
-                : await simklService.removeFromList(item, 'watchlist');
+                ? await simklService.addRating(item, 10)
+                : await simklService.removeRating(item);
         }
 
         if (success) {

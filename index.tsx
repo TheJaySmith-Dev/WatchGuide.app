@@ -2,7 +2,6 @@ import React, { Component, ReactNode, useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
-import Pricing from './pages/Pricing';
 import TermsOfService from './pages/TermsOfService';
 
 

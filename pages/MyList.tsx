@@ -3,7 +3,7 @@ import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
-import { Trash2, Film, Tv, Heart } from 'lucide-react';
+import { Trash2, Film, Tv, Heart, ChevronRight } from 'lucide-react';
 
 const MyList: React.FC = () => {
     const [activeList, setActiveList] = useState<'wantToWatch' | 'watched' | 'liked'>('wantToWatch');

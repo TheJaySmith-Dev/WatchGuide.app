@@ -198,6 +198,28 @@ class SimklService {
         }
     }
 
+    // Get all ratings from Simkl
+    async getRatings(): Promise<SimklListItem[]> {
+        if (!this.accessToken) return [];
+
+        try {
+            const response = await fetch(`${SIMKL_API_BASE}/sync/ratings`, {
+                headers: {
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'simkl-api-key': SIMKL_CLIENT_ID,
+                },
+            });
+
+            if (!response.ok) return [];
+
+            const data = await response.json();
+            return [...(data.movies || []), ...(data.shows || [])];
+        } catch (error) {
+            console.error('Get ratings error:', error);
+            return [];
+        }
+    }
+
     // Check if user is logged in
     isAuthenticated(): boolean {
         return this.accessToken !== null;
@@ -208,6 +230,75 @@ class SimklService {
         this.accessToken = null;
         localStorage.removeItem('simkl_access_token');
         localStorage.removeItem('simkl_user');
+    }
+
+    // Add item with rating to Simkl list
+    async addRating(item: MediaItem, rating: number = 10): Promise<boolean> {
+        if (!this.accessToken) return false;
+
+        const mediaType = item.media_type === 'movie' ? 'movies' : 'shows';
+        
+        try {
+            const payload = {
+                [mediaType]: [{
+                    title: item.title || item.name,
+                    year: item.release_date ? new Date(item.release_date).getFullYear() :
+                        item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined,
+                    ids: {
+                        tmdb: item.id,
+                    },
+                    rating: rating,
+                    rated_at: new Date().toISOString()
+                }],
+            };
+
+            const response = await fetch(`${SIMKL_API_BASE}/sync/ratings`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'simkl-api-key': SIMKL_CLIENT_ID,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Add rating error:', error);
+            return false;
+        }
+    }
+
+    // Remove rating from Simkl
+    async removeRating(item: MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+
+        const mediaType = item.media_type === 'movie' ? 'movies' : 'shows';
+        
+        try {
+            const payload = {
+                [mediaType]: [{
+                    ids: {
+                        tmdb: item.id,
+                    },
+                }],
+            };
+
+            const response = await fetch(`${SIMKL_API_BASE}/sync/ratings/remove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'simkl-api-key': SIMKL_CLIENT_ID,
+                },
+                body: JSON.stringify(payload),
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Remove rating error:', error);
+            return false;
+        }
     }
 
     // Bulk sync all local lists to Simkl

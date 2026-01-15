@@ -42,9 +42,7 @@ const TermsOfService: React.FC = () => {
             <section>
               <h2 className="text-lg font-semibold text-white mb-2">2. Accounts and Subscriptions</h2>
               <p className="text-gray-400">
-                Certain features may require an account or a paid subscription. Subscriptions are processed
-                securely via our billing partner through RevenueCat. Billing terms, renewal, and cancellation
-                are managed by your payment provider as surfaced in the Customer Center.
+                Certain features may require an account or a paid subscription.
               </p>
             </section>
 
