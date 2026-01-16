@@ -4,9 +4,10 @@ import { Home, Search, Menu, Bookmark, Calendar } from 'lucide-react';
 interface TabBarProps {
   activeTab: string;
   onTabChange: (tab: string) => void;
+  hideOnDesktop?: boolean;
 }
 
-const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
+const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, hideOnDesktop = false }) => {
   const tabs = [
     { id: 'browse', label: 'Browse', icon: Home },
     { id: 'mylist', label: 'My List', icon: Bookmark },
@@ -48,16 +49,17 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
         })}
       </div>
 
-      {/* Desktop Side Bar - Floating Vertical Liquid Capsule */}
-      <div className="hidden md:flex fixed left-6 top-1/2 -translate-y-1/2 flex-col items-center py-10 z-50 rounded-[3rem]
+      {/* Desktop Bottom Bar - Floating Liquid Capsule (Moved from side) */}
+      <div className={`hidden md:flex fixed bottom-8 left-1/2 -translate-x-1/2 flex-row items-center px-10 py-4 z-50 rounded-full
         bg-white/[0.06] backdrop-blur-sm 
         border border-white/20 
         shadow-[0_15px_40px_0_rgba(0,0,0,0.4)] 
         shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),inset_0_-1px_0_0_rgba(255,255,255,0.1)]
-        w-24 gap-12"
+        gap-12 transition-all duration-500 ease-in-out
+        ${hideOnDesktop ? 'translate-y-[150%] hover:translate-y-0 opacity-0 hover:opacity-100' : 'translate-y-0 opacity-100'}`}
       >
         {/* Logo */}
-        <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform cursor-pointer opacity-90 hover:opacity-100 ring-1 ring-white/10 shrink-0">
+        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform cursor-pointer opacity-90 hover:opacity-100 ring-1 ring-white/10 shrink-0">
           <img
             src="https://i.postimg.cc/dtpYyq9Z/Icon-i-OS-Dark-1024x1024-1x-2-2.png"
             alt="Watch Guide"
@@ -66,7 +68,7 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
         </div>
 
         {/* Navigation Items */}
-        <div className="flex flex-col items-center gap-8">
+        <div className="flex flex-row items-center gap-8">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -92,12 +94,12 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange }) => {
                 />
 
                 {/* Tooltip */}
-                <div className="absolute left-16 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl transform translate-x-4 group-hover:translate-x-0 duration-300">
+                <div className="absolute -top-12 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl transform translate-y-2 group-hover:translate-y-0 duration-300">
                   {tab.label}
                 </div>
 
-                {/* Active Indicator Line (Vertical) */}
-                {isActive && <div className="absolute -left-6 top-1/2 -translate-y-1/2 w-1 h-8 bg-indigo-400 rounded-r-full shadow-[0_0_15px_rgba(129,140,248,0.6)]" />}
+                {/* Active Indicator Line (Horizontal) */}
+                {isActive && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-1 bg-indigo-400 rounded-t-full shadow-[0_0_15px_rgba(129,140,248,0.6)]" />}
               </button>
             );
           })}

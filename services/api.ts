@@ -50,8 +50,8 @@ const FALLBACK_DATA: MediaItem[] = [
 
 // --- Image Helpers ---
 
-export const getImageUrl = (path: string | null, size: 'w500' | 'original' = 'w500') => {
-  if (!path) return 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=500&q=80';
+export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w185' = 'w500') => {
+  if (!path) return 'https://via.placeholder.com/500x750?text=No+Image';
   return `${IMAGE_BASE_URL}/${size}${path}`;
 };
 

@@ -1,4 +1,4 @@
-import { MediaItem } from '../types';
+import { MediaItem, TraktList, CustomListConfig } from '../types';
 import { simklService } from './simkl';
 import { traktService } from './trakt';
 
@@ -10,15 +10,41 @@ class StorageService {
         planToWatch: MediaItem[];
         watched: MediaItem[];
         liked: MediaItem[];
+        likedLists: TraktList[];
+        customLists: CustomListConfig[];
         lastFetch: number;
+        listItems: Record<number, { items: MediaItem[], timestamp: number }>;
     } = {
             planToWatch: [],
             watched: [],
             liked: [],
-            lastFetch: 0
+            likedLists: [],
+            customLists: [],
+            lastFetch: 0,
+            listItems: {}
         };
 
     private CACHE_DURATION = 0; // Disable cache for now to ensure sync
+    private LIST_CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache for lists
+
+    constructor() {
+        this.loadLocalCustomLists();
+    }
+
+    private loadLocalCustomLists() {
+        try {
+            const saved = localStorage.getItem('custom_lists');
+            if (saved) {
+                this.cache.customLists = JSON.parse(saved);
+            }
+        } catch (e) {
+            console.error('Failed to load custom lists', e);
+        }
+    }
+
+    private saveLocalCustomLists() {
+        localStorage.setItem('custom_lists', JSON.stringify(this.cache.customLists));
+    }
 
     // Fetch lists from Simkl and Trakt
     async fetchLists(force = false): Promise<void> {
@@ -31,7 +57,15 @@ class StorageService {
         const isTraktAuth = traktService.isAuthenticated();
 
         if (!isSimklAuth && !isTraktAuth) {
-            this.cache = { planToWatch: [], watched: [], liked: [], lastFetch: 0 };
+            this.cache = { 
+                planToWatch: [], 
+                watched: [], 
+                liked: [], 
+                likedLists: [], 
+                customLists: this.cache.customLists, // Preserve local custom lists
+                lastFetch: 0, 
+                listItems: {} 
+            };
             return;
         }
 
@@ -47,18 +81,11 @@ class StorageService {
             const traktPromise = isTraktAuth ? Promise.all([
                 traktService.getWatchlist(),
                 traktService.getWatched(),
-                // Use getFavorites if strictly requested, but standard practice is often Ratings for "Likes" in these apps.
-                // However, since Trakt Favorites endpoint is read-only or tricky, I will use Ratings for consistency with Simkl.
-                // But wait, the user asked for "Trakt's Favourites list".
-                // I'll fetch /sync/favorites for reading, but map "Liked" writes to Ratings 10?
-                // Or just use Ratings for everything "Liked"?
-                // Let's use Ratings for now as implemented in traktService.addToFavorites
-                // Actually, I should probably read from Ratings too if I'm writing to Ratings.
-                // But let's add Favorites to the read list just in case they have legacy favorites.
-                traktService.getFavorites() 
-            ]) : Promise.resolve([[], [], []]);
+                traktService.getFavorites(),
+                traktService.getLikedLists()
+            ]) : Promise.resolve([[], [], [], []]);
 
-            const [[simklWatchlist, simklWatched, simklRated], [traktWatchlist, traktWatched, traktFavorites]] = await Promise.all([simklPromise, traktPromise]);
+            const [[simklWatchlist, simklWatched, simklRated], [traktWatchlist, traktWatched, traktFavorites, traktLikedLists]] = await Promise.all([simklPromise, traktPromise]);
 
             // Convert items
             const simklPlanToWatch = await simklService.convertToMediaItems(simklWatchlist);
@@ -74,11 +101,13 @@ class StorageService {
             this.cache.watched = this.mergeLists(simklWatchedItems, traktWatchedItems);
             // Merge Simkl Liked (Ratings) with Trakt Favorites (and maybe Trakt Ratings if we fetched them)
             this.cache.liked = this.mergeLists(simklLikedItems, traktLikedItems);
+            this.cache.likedLists = (traktLikedLists as TraktList[]) || [];
 
             console.log('StorageService Fetch Complete:', {
                 planToWatch: this.cache.planToWatch.length,
                 watched: this.cache.watched.length,
                 liked: this.cache.liked.length,
+                likedLists: this.cache.likedLists.length,
                 sources: {
                     simkl: isSimklAuth,
                     trakt: isTraktAuth
@@ -182,6 +211,87 @@ class StorageService {
             return false;
         }
         return this.cache[type].some(i => i.id === id);
+    }
+
+    // Get liked lists (Legacy)
+    getLikedLists(): TraktList[] {
+        return this.cache.likedLists || [];
+    }
+    
+    // Get Custom Lists (New)
+    getCustomLists(): CustomListConfig[] {
+        return this.cache.customLists || [];
+    }
+
+    // Add a custom list
+    addCustomList(config: Omit<CustomListConfig, 'id'>) {
+        const newList: CustomListConfig = {
+            ...config,
+            id: crypto.randomUUID(),
+        };
+        this.cache.customLists = [...this.cache.customLists, newList];
+        this.saveLocalCustomLists();
+        return newList;
+    }
+
+    // Remove a custom list
+    removeCustomList(id: string) {
+        this.cache.customLists = this.cache.customLists.filter(l => l.id !== id);
+        this.saveLocalCustomLists();
+    }
+
+    // Get Items for a specific Trakt List (with caching)
+    async getTraktListItems(listId: number): Promise<MediaItem[]> {
+        const now = Date.now();
+        const cached = this.cache.listItems[listId];
+
+        if (cached && (now - cached.timestamp < this.LIST_CACHE_DURATION)) {
+            return cached.items;
+        }
+
+        try {
+            const listItems = await traktService.getListItems(listId);
+            const mediaItems = await traktService.convertToMediaItems(listItems);
+            
+            // Update cache
+            this.cache.listItems[listId] = {
+                items: mediaItems,
+                timestamp: now
+            };
+            
+            return mediaItems;
+        } catch (error) {
+            console.error(`Failed to fetch items for list ${listId}`, error);
+            return cached ? cached.items : []; // Return stale data if fetch fails
+        }
+    }
+
+    // Toggle list like
+    async toggleListLike(list: TraktList): Promise<boolean> {
+        if (!traktService.isAuthenticated()) {
+            alert('Please log in to Trakt to manage lists');
+            return false;
+        }
+
+        const isLiked = this.cache.likedLists.some(l => l.ids.trakt === list.ids.trakt);
+        let success = false;
+
+        if (isLiked) {
+            success = await traktService.unlikeList(list.ids.trakt);
+        } else {
+            success = await traktService.likeList(list.ids.trakt);
+        }
+
+        if (success) {
+            if (isLiked) {
+                this.cache.likedLists = this.cache.likedLists.filter(l => l.ids.trakt !== list.ids.trakt);
+            } else {
+                this.cache.likedLists = [...this.cache.likedLists, list];
+            }
+            return true;
+        }
+
+        return false;
     }
 
     // Get AI recommendations (kept for compatibility)

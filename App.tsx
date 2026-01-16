@@ -8,7 +8,7 @@ import Countdown from './pages/Countdown';
 import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
-import GuideAIBot from './components/GuideAIBot';
+import OnboardingTour from './components/OnboardingTour';
 import { simklService } from './services/simkl';
 import { traktService } from './services/trakt';
 import { MediaItem, SimklUser, TraktUser } from './types';
@@ -21,6 +21,8 @@ const App: React.FC = () => {
   const [region, setRegion] = useState('US');
   const [simklUser, setSimklUser] = useState<SimklUser | null>(null);
   const [traktUser, setTraktUser] = useState<TraktUser | null>(null);
+  const [isListsViewOpen, setIsListsViewOpen] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const authProcessing = useRef(false);
 
   // Simple Hash Router Implementation
@@ -36,6 +38,12 @@ const App: React.FC = () => {
     // Listen for hash changes
     window.addEventListener('hashchange', handleHashChange);
     return () => window.removeEventListener('hashchange', handleHashChange);
+    // Check for onboarding
+    const hasSeenOnboarding = localStorage.getItem('has_seen_onboarding_v1');
+    if (!hasSeenOnboarding) {
+        // Small delay to let the app load first
+        setTimeout(() => setShowOnboarding(true), 1500);
+    }
   }, []);
 
   const handleTabChange = (tab: string) => {
@@ -147,6 +155,7 @@ const App: React.FC = () => {
             simklUser={simklUser}
             traktUser={traktUser}
             onCountdownClick={() => handleTabChange('countdown')}
+            onListsToggle={setIsListsViewOpen}
           />
         );
       default:
@@ -163,7 +172,11 @@ const App: React.FC = () => {
       </main>
 
       {/* Navigation */}
-      <TabBar activeTab={activeTab} onTabChange={handleTabChange} />
+      <TabBar 
+        activeTab={activeTab} 
+        onTabChange={handleTabChange} 
+        hideOnDesktop={selectedCollectionId !== null || isListsViewOpen} // Hide on list view (handled inside 'more' logic)
+      />
 
       {/* Media Detail Overlay */}
       {selectedItem && (
@@ -195,10 +208,15 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* GuideAI Assistant - Desktop Floating */}
-      <div className="hidden md:block">
-        <GuideAIBot contextItem={selectedItem} />
-      </div>
+ {/* GuideAI Bot Overlay - Removed as it's now a full page in More */}
+      
+      {/* Onboarding Tour */}
+      {showOnboarding && (
+        <OnboardingTour onComplete={() => {
+            setShowOnboarding(false);
+            localStorage.setItem('has_seen_onboarding_v1', 'true');
+        }} />
+      )}
     </div>
   );
 };

@@ -1,11 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person, TraktUser } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { traktService } from '../services/trakt';
-import GuideAIBot from '../components/GuideAIBot';
+import ListsPage from './ListsPage';
+
+import GuideAIPage from './GuideAIPage';
+import ReleaseNotesPage from './ReleaseNotesPage';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -14,6 +17,7 @@ interface MoreProps {
     simklUser?: any;
     traktUser?: TraktUser | null;
     onCountdownClick?: () => void;
+    onListsToggle?: (isOpen: boolean) => void;
 }
 
 const regions = [
@@ -33,24 +37,45 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, traktUser, onCountdownClick }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, traktUser, onCountdownClick, onListsToggle }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
+    const [showLists, setShowLists] = useState(false);
+    const [showGuideAI, setShowGuideAI] = useState(false);
+    const [showReleaseNotes, setShowReleaseNotes] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
     }, []);
 
+    // Notify parent when lists view is toggled
+    useEffect(() => {
+        if (onListsToggle) {
+            onListsToggle(showLists || showGuideAI || showReleaseNotes);
+        }
+    }, [showLists, showGuideAI, showReleaseNotes, onListsToggle]);
+
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
+
+    if (showLists) {
+        return <ListsPage 
+            onBack={() => {
+                setShowLists(false);
+            }}
+            onPersonClick={onPersonClick} 
+        />;
+    }
+
+    if (showGuideAI) {
+        return <GuideAIPage onBack={() => setShowGuideAI(false)} />;
+    }
+
+    if (showReleaseNotes) {
+        return <ReleaseNotesPage onBack={() => setShowReleaseNotes(false)} />;
+    }
 
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
-
-            {/* GuideAI Section - Only on Mobile */}
-            <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
-                <GuideAIBot isMobileInline={true} />
-            </div>
 
             {/* Subscriptions */}
             {/* Removed per user request */}
@@ -59,6 +84,30 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             <div className="max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Features</h2>
                 <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                    <button
+                        onClick={() => setShowGuideAI(true)}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
+                                <BrainCircuit size={20} />
+                            </div>
+                            <span className="text-white">GuideAI Assistant</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
+                    <button
+                        onClick={() => setShowLists(true)}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                                <List size={20} />
+                            </div>
+                            <span className="text-white">Lists</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
                     <button
                         onClick={onCountdownClick}
                         className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
@@ -169,6 +218,21 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <ChevronRight size={16} />
                         </div>
                     </div>
+                    <button
+                        onClick={() => setShowReleaseNotes(true)}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+                                <Sparkles size={20} />
+                            </div>
+                            <span className="text-white">What's New</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30">v1.1.0</span>
+                            <ChevronRight size={16} />
+                        </div>
+                    </button>
                     <a
                         href="/tos"
                         className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors"

@@ -162,6 +162,43 @@ export interface TraktUser {
   };
 }
 
+export interface TraktList {
+  name: string;
+  description: string;
+  privacy: 'public' | 'private' | 'friends';
+  share_link: string;
+  type: 'personal' | 'official' | 'watch_list' | 'favorites';
+  display_numbers: boolean;
+  allow_comments: boolean;
+  sort_by: string;
+  sort_how: string;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+  comment_count: number;
+  likes: number;
+  ids: {
+    trakt: number;
+    slug: string;
+  };
+  user: TraktUser;
+}
+
+export interface TraktListSearchResult {
+  type: string;
+  score: number;
+  list: TraktList;
+}
+
+export interface CustomListConfig {
+    id: string; // Unique ID for the home screen entry
+    traktList: TraktList;
+    customName?: string;
+    thumbnailUrl?: string;
+    items?: MediaItem[]; // Cached items
+    lastFetch?: number;
+}
+
 export interface TraktListItem {
   type: 'movie' | 'show' | 'episode'; // Trakt uses 'show', Simkl 'tv'
   movie?: {

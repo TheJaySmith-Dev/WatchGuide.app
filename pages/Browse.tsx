@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { getTrending, getMovies, getTVShows, getRecommendations, getSimilarMedia, searchMulti } from '../services/api';
-import { MediaItem } from '../types';
+import { MediaItem, TraktList } from '../types';
 import HeroCarousel from '../components/HeroCarousel';
 import ContentRow from '../components/ContentRow';
-import { AlertCircle, Sparkles, Loader2 } from 'lucide-react';
+import TraktListRow from '../components/TraktListRow';
+import { AlertCircle, Sparkles, Loader2, ListPlus } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { sendMessageToPoe } from '../services/poe';
 
@@ -18,6 +19,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const [topRatedMovies, setTopRatedMovies] = useState<MediaItem[]>([]);
   const [similarItems, setSimilarItems] = useState<{ title: string; items: MediaItem[] } | null>(null);
   const [aiRecommendations, setAiRecommendations] = useState<MediaItem[]>([]);
+  const [customLists, setCustomLists] = useState<import('../types').CustomListConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(false);
@@ -45,8 +47,11 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
         }
 
         // Personalized rows
-        const likedItems = storageService.getList('liked');
-        const watchedItems = storageService.getList('watched');
+        const likedItems = await storageService.getList('liked');
+        const watchedItems = await storageService.getList('watched');
+        
+        // Load custom lists
+        setCustomLists(storageService.getCustomLists());
 
         const referenceItem = likedItems[likedItems.length - 1] || watchedItems[watchedItems.length - 1];
 
@@ -71,11 +76,15 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
     fetchData();
   }, []);
 
+  const refreshLists = () => {
+      setCustomLists(storageService.getCustomLists());
+  };
+
   const handleLoadAIRecommendations = async () => {
     setAiLoading(true);
     try {
-      const likedItems = storageService.getList('liked');
-      const watchedItems = storageService.getList('watched');
+      const likedItems = storageService.getListSync('liked');
+      const watchedItems = storageService.getListSync('watched');
 
       if (likedItems.length === 0 && watchedItems.length === 0) {
         alert("Add some movies to your Liked or Watched lists first so the AI knows what you enjoy!");
@@ -175,7 +184,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
       <div className="-mt-16 relative z-30 space-y-8 pb-10">
 
         {/* AI For You Row - Only shows if 3+ items in library */}
-        {(storageService.getList('liked').length + storageService.getList('watched').length) >= 3 && (
+        {(storageService.getListSync('liked').length + storageService.getListSync('watched').length) >= 3 && (
           <div className="px-6 md:px-12">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -201,6 +210,15 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
             )}
           </div>
         )}
+
+        {/* Custom Lists */}
+        {customLists.map(list => (
+            <TraktListRow 
+              key={list.id} 
+              list={{...list.traktList, name: list.customName || list.traktList.name}} // Override name for display
+              onItemClick={onItemClick}
+            />
+        ))}
 
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />

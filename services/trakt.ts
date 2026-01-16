@@ -394,6 +394,118 @@ class TraktService {
 
         return mediaItems;
     }
+
+    // Search Lists
+    async searchLists(query: string): Promise<import('../types').TraktListSearchResult[]> {
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/search/list?query=${encodeURIComponent(query)}`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+            });
+
+            if (!response.ok) return [];
+            return await response.json();
+        } catch (error) {
+            console.error('Search Trakt lists error:', error);
+            return [];
+        }
+    }
+
+    // Get User's Liked Lists
+    async getLikedLists(): Promise<import('../types').TraktList[]> {
+        if (!this.accessToken) return [];
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/users/me/likes/lists`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+            });
+
+            if (!response.ok) return [];
+            // Response is array of { liked_at, list: TraktList }
+            const data = await response.json();
+            return data.map((item: any) => item.list);
+        } catch (error) {
+            console.error('Get Trakt liked lists error:', error);
+            return [];
+        }
+    }
+
+    // Like a List
+    async likeList(listId: number): Promise<boolean> {
+        if (!this.accessToken) return false;
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/lists/${listId}/like`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+            });
+
+            return response.ok; // 204 No Content usually
+        } catch (error) {
+            console.error('Like Trakt list error:', error);
+            return false;
+        }
+    }
+
+    // Unlike a List
+    async unlikeList(listId: number): Promise<boolean> {
+        if (!this.accessToken) return false;
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/lists/${listId}/like`, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Unlike Trakt list error:', error);
+            return false;
+        }
+    }
+
+    // Get List Items
+    async getListItems(listId: number | string): Promise<TraktListItem[]> {
+        const headers: any = {
+            'Content-Type': 'application/json',
+            'trakt-api-version': '2',
+            'trakt-api-key': TRAKT_CLIENT_ID,
+        };
+        
+        if (this.accessToken) {
+            headers['Authorization'] = `Bearer ${this.accessToken}`;
+        }
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/lists/${listId}/items`, {
+                headers
+            });
+
+            if (!response.ok) return [];
+            return await response.json();
+        } catch (error) {
+            console.error('Get Trakt list items error:', error);
+            return [];
+        }
+    }
 }
 
 export const traktService = new TraktService();

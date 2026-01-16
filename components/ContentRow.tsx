@@ -9,9 +9,10 @@ interface ContentRowProps {
   isPoster?: boolean;
   onItemClick: (item: MediaItem) => void;
   hideTitle?: boolean;
+  headerContent?: React.ReactNode;
 }
 
-const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, onItemClick, hideTitle = false }) => {
+const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, onItemClick, hideTitle = false, headerContent }) => {
   const rowRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -31,7 +32,10 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
     <div className="py-2 space-y-4 group/row">
       {!hideTitle && (
         <div className="flex items-center justify-between px-6 md:pl-40 md:pr-12">
-          <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight">{title}</h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight">{title}</h2>
+            {headerContent}
+          </div>
           <div className="flex gap-2 opacity-0 group-hover/row:opacity-100 transition-opacity">
             <button onClick={() => scroll('left')} className="p-2 hover:bg-white/10 rounded-full"><ChevronLeft size={20} /></button>
             <button onClick={() => scroll('right')} className="p-2 hover:bg-white/10 rounded-full"><ChevronRight size={20} /></button>

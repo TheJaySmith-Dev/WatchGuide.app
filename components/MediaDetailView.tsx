@@ -145,13 +145,8 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                     </div>
 
                     <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 flex flex-col md:flex-row items-end gap-8">
-                        {/* Poster */}
-                        <div className="hidden md:block w-48 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0 transform translate-y-16">
-                            <img src={getImageUrl(displayItem.poster_path)} className="w-full h-auto" alt="Poster" />
-                        </div>
-
                         <div className="flex-1 mb-4 md:mb-0">
-                            <h1 className="text-4xl md:text-6xl font-black text-white mb-2 leading-tight drop-shadow-xl">
+                            <h1 className="text-3xl md:text-5xl font-black text-white mb-2 leading-tight drop-shadow-xl">
                                 {displayItem.title || displayItem.name}
                             </h1>
                             {details?.tagline && (
@@ -214,7 +209,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                 </div>
 
                 {/* Content Body */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 p-6 md:p-12 md:mt-8 bg-gradient-to-b from-black/80 to-black/95">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 p-6 md:p-12 bg-gradient-to-b from-black/80 to-black/95">
 
                     {/* Left Sidebar */}
                     <div className="md:col-span-3 space-y-8">
@@ -367,18 +362,21 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                                     {cast.map(person => (
                                         <div
                                             key={person.id}
-                                            className="snap-start shrink-0 w-32 group cursor-pointer"
-                                            onClick={() => onPersonClick(person.id)}
+                                            className="snap-start shrink-0 w-32 group cursor-pointer relative z-10"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onPersonClick(person.id);
+                                            }}
                                         >
-                                            <div className="w-32 h-32 rounded-full overflow-hidden mb-3 border-2 border-white/10 group-hover:border-indigo-500 transition-colors">
+                                            <div className="w-32 h-32 rounded-full overflow-hidden mb-3 border-2 border-white/10 group-hover:border-indigo-500 transition-colors pointer-events-none">
                                                 <img
-                                                    src={getImageUrl(person.profile_path, 'w500')}
+                                                    src={getImageUrl(person.profile_path, 'w185')}
                                                     alt={person.name}
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
-                                            <h4 className="text-white font-medium text-sm text-center truncate group-hover:text-indigo-400 transition-colors">{person.name}</h4>
-                                            <p className="text-gray-500 text-xs text-center truncate">{person.character}</p>
+                                            <h4 className="text-white font-medium text-sm text-center truncate group-hover:text-indigo-400 transition-colors pointer-events-none">{person.name}</h4>
+                                            <p className="text-gray-500 text-xs text-center truncate pointer-events-none">{person.character}</p>
                                         </div>
                                     ))}
                                 </div>
