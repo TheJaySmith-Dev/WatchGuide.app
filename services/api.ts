@@ -143,6 +143,15 @@ export const getMediaDetails = async (type: 'movie' | 'tv', id: number): Promise
   }
 };
 
+export const getMediaBasic = async (type: 'movie' | 'tv', id: number): Promise<MediaItem | null> => {
+  try {
+    const data = await fetchTMDB<MediaItem>(`/${type}/${id}`);
+    return { ...data, media_type: type };
+  } catch {
+    return null;
+  }
+};
+
 export const getCollectionDetails = async (id: number): Promise<CollectionDetail> => {
   return fetchTMDB<CollectionDetail>(`/collection/${id}`);
 };

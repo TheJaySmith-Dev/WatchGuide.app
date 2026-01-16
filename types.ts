@@ -145,4 +145,43 @@ export interface SimklListItem {
     tmdb?: number;
     imdb?: string;
   };
+  type?: 'movie' | 'tv';
+}
+
+// Trakt Types
+export interface TraktUser {
+  username: string;
+  name: string;
+  ids: {
+    slug: string;
+  };
+  images?: {
+    avatar: {
+      full: string;
+    };
+  };
+}
+
+export interface TraktListItem {
+  type: 'movie' | 'show' | 'episode'; // Trakt uses 'show', Simkl 'tv'
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tmdb: number;
+      imdb: string;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tmdb: number;
+      imdb: string;
+    };
+  };
 }

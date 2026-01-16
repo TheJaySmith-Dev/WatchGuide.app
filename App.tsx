@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import TabBar from './components/TabBar';
 import Browse from './pages/Browse';
 import Search from './pages/Search';
@@ -10,7 +10,8 @@ import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
 import GuideAIBot from './components/GuideAIBot';
 import { simklService } from './services/simkl';
-import { MediaItem, SimklUser } from './types';
+import { traktService } from './services/trakt';
+import { MediaItem, SimklUser, TraktUser } from './types';
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('browse');
@@ -19,6 +20,8 @@ const App: React.FC = () => {
   const [selectedCollectionId, setSelectedCollectionId] = useState<number | null>(null);
   const [region, setRegion] = useState('US');
   const [simklUser, setSimklUser] = useState<SimklUser | null>(null);
+  const [traktUser, setTraktUser] = useState<TraktUser | null>(null);
+  const authProcessing = useRef(false);
 
   // Simple Hash Router Implementation
   useEffect(() => {
@@ -41,24 +44,61 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    // Handle Simkl OAuth callback
+    // Handle OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    const provider = localStorage.getItem('auth_provider_pending');
 
-    if (code) {
-      simklService.handleOAuthCallback(code).then(success => {
-        if (success) {
-          simklService.getCurrentUser().then(user => {
-            setSimklUser(user);
-            // Clean up URL but preserve hash if present, or default to current tab
+    if (code && !authProcessing.current) {
+      authProcessing.current = true;
+      
+      // Determine which provider to use
+      if (provider === 'trakt') {
+          traktService.handleOAuthCallback(code).then(success => {
             const currentHash = window.location.hash || `#/${activeTab}`;
             window.history.replaceState({}, document.title, window.location.pathname + currentHash);
+            
+            if (success) {
+                alert('Successfully connected to Trakt!');
+                traktService.getCurrentUser().then(setTraktUser);
+            } else {
+                alert('Failed to connect to Trakt.');
+            }
+            localStorage.removeItem('auth_provider_pending');
+            authProcessing.current = false;
           });
-        }
-      });
-    } else if (simklService.isAuthenticated()) {
-      // Load existing user
-      simklService.getCurrentUser().then(setSimklUser);
+      } else {
+          // Default to Simkl if not specified or 'simkl'
+          simklService.handleOAuthCallback(code).then(success => {
+            // ALWAYS clear the code from URL to prevent refresh loops that trigger rate limits
+            const currentHash = window.location.hash || `#/${activeTab}`;
+            window.history.replaceState({}, document.title, window.location.pathname + currentHash);
+
+            if (success) {
+              alert('Successfully connected to Simkl!');
+              simklService.getCurrentUser().then(setSimklUser);
+            } else {
+              // Check for rate limit error in local storage or just generic message
+              const lastError = localStorage.getItem('simkl_last_error');
+              if (lastError && lastError.includes('412')) {
+                alert('Connection limit exceeded. Please wait a few minutes before trying to connect again.');
+              } else {
+                alert('Failed to connect to Simkl. The authorization code may have expired or been used. Please try connecting again.');
+              }
+              localStorage.removeItem('simkl_last_error');
+            }
+            localStorage.removeItem('auth_provider_pending');
+            authProcessing.current = false;
+          });
+      }
+    } else {
+      // Load existing users
+      if (simklService.isAuthenticated()) {
+        simklService.getCurrentUser().then(setSimklUser);
+      }
+      if (traktService.isAuthenticated()) {
+        traktService.getCurrentUser().then(setTraktUser);
+      }
     }
   }, []);
 
@@ -105,6 +145,7 @@ const App: React.FC = () => {
             currentRegion={region}
             onRegionChange={setRegion}
             simklUser={simklUser}
+            traktUser={traktUser}
             onCountdownClick={() => handleTabChange('countdown')}
           />
         );

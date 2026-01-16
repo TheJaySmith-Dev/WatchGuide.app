@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
-import { Person } from '../types';
+import { Person, TraktUser } from '../types';
 import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
+import { traktService } from '../services/trakt';
 import GuideAIBot from '../components/GuideAIBot';
 
 interface MoreProps {
@@ -11,6 +12,7 @@ interface MoreProps {
     currentRegion: string;
     onRegionChange: (region: string) => void;
     simklUser?: any;
+    traktUser?: TraktUser | null;
     onCountdownClick?: () => void;
 }
 
@@ -31,7 +33,7 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, onCountdownClick }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, traktUser, onCountdownClick }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
 
@@ -76,6 +78,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             <div className="max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Cloud Sync</h2>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                    {/* Simkl Integration */}
                     {simklUser ? (
                         <>
                             <div className="flex items-center gap-4">
@@ -98,24 +101,54 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                     Logout
                                 </button>
                             </div>
-                            <p className="text-gray-400 text-sm text-center">
-                                All your watchlists are automatically synced with Simkl
-                            </p>
                         </>
                     ) : (
-                        <>
-                            <p className="text-gray-400 text-sm">
-                                Connect to Simkl for automatic cloud sync across all your devices.
-                            </p>
-                            <button
-                                onClick={() => simklService.initiateOAuth()}
-                                className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
-                            >
-                                <span>Connect Simkl Account</span>
-                                <ChevronRight size={18} />
-                            </button>
-                        </>
+                        <button
+                            onClick={() => simklService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
+                        >
+                            <span>Connect Simkl Account</span>
+                            <ChevronRight size={18} />
+                        </button>
                     )}
+
+                    {/* Trakt Integration */}
+                    {traktUser ? (
+                        <>
+                            <div className="flex items-center gap-4 border-t border-white/10 pt-6">
+                                <img
+                                    src={traktUser.images?.avatar?.full || 'https://trakt.tv/assets/placeholders/default-user.png'}
+                                    alt={traktUser.name || traktUser.username}
+                                    className="w-12 h-12 rounded-full border-2 border-red-500"
+                                />
+                                <div className="flex-1">
+                                    <p className="text-white font-medium">{traktUser.name || traktUser.username}</p>
+                                    <p className="text-gray-400 text-sm">Connected to Trakt</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        traktService.logout();
+                                        window.location.reload();
+                                    }}
+                                    className="px-4 py-2 bg-rose-600/20 border border-rose-500/30 rounded-xl hover:bg-rose-600/30 transition-all text-rose-400 text-sm font-medium"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => traktService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all text-red-400 font-medium"
+                        >
+                            <span>Connect Trakt Account</span>
+                            <ChevronRight size={18} />
+                        </button>
+                    )}
+
+                    <p className="text-gray-400 text-sm text-center">
+                        Sync your watchlists across devices automatically using Simkl or Trakt.
+                    </p>
                 </div>
             </div>
 

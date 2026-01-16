@@ -3,6 +3,7 @@ import { MediaItem } from '../types';
 import { getImageUrl } from '../services/api';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
+import { traktService } from '../services/trakt';
 import { Trash2, Film, Tv, Heart, ChevronRight } from 'lucide-react';
 
 interface MyListProps {
@@ -19,44 +20,46 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
     const [loading, setLoading] = useState(true);
 
     const [simklUser, setSimklUser] = useState<any>(null);
+    const [traktUser, setTraktUser] = useState<any>(null);
+
+    const isAuthenticated = simklService.isAuthenticated() || traktService.isAuthenticated();
 
     useEffect(() => {
         const loadLists = async () => {
-            if (simklService.isAuthenticated()) {
+            console.log('Loading lists...', { simkl: simklService.isAuthenticated(), trakt: traktService.isAuthenticated() });
+            setLoading(true);
+            
+            if (isAuthenticated) {
                 // Load user info for profile link
-                const user = await simklService.getCurrentUser();
-                setSimklUser(user);
+                if (simklService.isAuthenticated()) {
+                    const user = await simklService.getCurrentUser();
+                    setSimklUser(user);
+                }
+                if (traktService.isAuthenticated()) {
+                    const user = await traktService.getCurrentUser();
+                    setTraktUser(user);
+                }
                 
                 await storageService.refresh();
-                setLists({
+                const newLists = {
                     planToWatch: storageService.getListSync('planToWatch'),
                     watched: storageService.getListSync('watched'),
                     liked: storageService.getListSync('liked')
-                });
+                };
+                console.log('Lists loaded:', newLists);
+                setLists(newLists);
             }
             setLoading(false);
         };
         loadLists();
     }, []);
 
-    const openSimklProfile = () => {
-        if (simklUser?.user?.name) {
-            // Map internal list types to Simkl URL segments
-            // watchlist -> plan-to-watch
-            // watched -> completed
-            // liked -> all (or just dashboard)
-            let segment = 'dashboard';
-            if (activeList === 'planToWatch') segment = 'plan-to-watch';
-            else if (activeList === 'watched') segment = 'completed';
-            else if (activeList === 'liked') segment = 'all'; // Ratings usually in all or dashboard
-            
-            window.open(`https://simkl.com/u/${simklUser.user.name}/${segment}`, '_blank');
-        } else {
-            window.open('https://simkl.com/dashboard', '_blank');
-        }
+    const getSyncStatusText = () => {
+        if (simklService.isAuthenticated() && traktService.isAuthenticated()) return 'Synced with Simkl & Trakt';
+        if (simklService.isAuthenticated()) return 'Synced with Simkl';
+        if (traktService.isAuthenticated()) return 'Synced with Trakt';
+        return 'Please log in to Simkl or Trakt to view your lists';
     };
-
-    const currentList = lists[activeList];
 
     const handleRemove = async (item: MediaItem) => {
         await storageService.toggleItem(activeList, item);
@@ -69,14 +72,14 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
         });
     };
 
+    const currentList = lists[activeList];
+
     return (
         <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32">
             <header className="mb-10">
                 <h1 className="text-4xl font-black text-white">My Library</h1>
                 <p className="text-gray-400 mt-2">
-                    {simklService.isAuthenticated()
-                        ? 'Synced with Simkl'
-                        : 'Please log in to Simkl to view your lists'}
+                    {getSyncStatusText()}
                 </p>
             </header>
 
@@ -126,9 +129,9 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
             {/* Content Grid */}
             {loading ? (
                 <div className="text-center text-gray-400 py-20">Loading...</div>
-            ) : !simklService.isAuthenticated() ? (
+            ) : !isAuthenticated ? (
                 <div className="text-center text-gray-400 py-20">
-                    <p>Please log in to Simkl from the More tab to view your lists</p>
+                    <p>Please log in to Simkl or Trakt from the More tab to view your lists</p>
                 </div>
             ) : currentList.length === 0 ? (
                 <div className="text-center text-gray-400 py-20">
