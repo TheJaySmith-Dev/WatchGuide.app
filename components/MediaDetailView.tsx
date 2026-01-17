@@ -154,6 +154,18 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                             )}
 
                             <div className="flex flex-wrap items-center gap-4 text-sm md:text-base text-gray-300">
+                                {details?.ratings?.rottenTomatoes && (
+                                    <div className="flex items-center gap-1.5 bg-[#FA320A]/10 text-[#FA320A] px-2 py-1 rounded font-bold border border-[#FA320A]/20">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg" className="w-4 h-4" alt="RT" />
+                                        <span>{details.ratings.rottenTomatoes}</span>
+                                    </div>
+                                )}
+                                {details?.ratings?.imdb && (
+                                    <div className="flex items-center gap-1.5 bg-[#F5C518]/10 text-[#F5C518] px-2 py-1 rounded font-bold border border-[#F5C518]/20">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/IMDb_Logo_Rectangle.svg/640px-IMDb_Logo_Rectangle.svg.png" className="w-8 h-auto object-contain" alt="IMDb" />
+                                        <span>{details.ratings.imdb}</span>
+                                    </div>
+                                )}
                                 {displayItem.vote_average && (
                                     <div className="flex items-center gap-1 text-green-400 font-bold bg-green-400/10 px-2 py-1 rounded">
                                         <Star size={16} fill="currentColor" />

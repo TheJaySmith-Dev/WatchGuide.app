@@ -419,7 +419,8 @@ class TraktService {
         if (!this.accessToken) return [];
 
         try {
-            const response = await fetch(`${TRAKT_API_URL}/users/me/likes/lists`, {
+            // Increase limit to 100 to ensure we get most lists
+            const response = await fetch(`${TRAKT_API_URL}/users/me/likes/lists?limit=100`, {
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${this.accessToken}`,

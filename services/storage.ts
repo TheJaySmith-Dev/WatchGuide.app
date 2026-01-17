@@ -103,6 +103,28 @@ class StorageService {
             this.cache.liked = this.mergeLists(simklLikedItems, traktLikedItems);
             this.cache.likedLists = (traktLikedLists as TraktList[]) || [];
 
+            // Sync Custom Lists with Trakt Liked Lists
+            if (this.cache.likedLists.length > 0) {
+                const existingIds = new Set(this.cache.customLists.map(l => l.traktList.ids.trakt));
+                let hasChanges = false;
+
+                this.cache.likedLists.forEach(list => {
+                    if (!existingIds.has(list.ids.trakt)) {
+                        // Add new liked list to custom lists
+                        this.cache.customLists.push({
+                            id: crypto.randomUUID(),
+                            traktList: list,
+                            customName: list.name,
+                        });
+                        hasChanges = true;
+                    }
+                });
+
+                if (hasChanges) {
+                    this.saveLocalCustomLists();
+                }
+            }
+
             console.log('StorageService Fetch Complete:', {
                 planToWatch: this.cache.planToWatch.length,
                 watched: this.cache.watched.length,

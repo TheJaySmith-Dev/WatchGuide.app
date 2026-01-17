@@ -1,6 +1,7 @@
 import { MediaItem, MediaDetail, Person, CollectionDetail } from '../types';
 
 const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
+const OMDB_API_KEY = 'c60b7091';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
@@ -133,9 +134,29 @@ export const searchPeople = async (query: string): Promise<Person[]> => {
 
 export const getMediaDetails = async (type: 'movie' | 'tv', id: number): Promise<MediaDetail> => {
   try {
-    return await fetchTMDB<MediaDetail>(`/${type}/${id}`, {
+    const details = await fetchTMDB<MediaDetail>(`/${type}/${id}`, {
       append_to_response: 'credits,external_ids,images,videos,similar,recommendations,watch/providers'
     });
+
+    // Fetch OMDB Ratings if IMDB ID exists
+    if (details.external_ids?.imdb_id) {
+        try {
+            const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${details.external_ids.imdb_id}`);
+            const omdbData = await omdbRes.json();
+            
+            if (omdbData.Response === 'True') {
+                details.ratings = {
+                    imdb: omdbData.imdbRating,
+                    rottenTomatoes: omdbData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes')?.Value,
+                    metacritic: omdbData.Metascore !== 'N/A' ? omdbData.Metascore : undefined
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to fetch OMDB ratings', e);
+        }
+    }
+
+    return details;
   } catch {
     // Return basic dummy detail if fetch fails
     const fallback = FALLBACK_DATA.find(i => i.id === id);

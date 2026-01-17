@@ -113,6 +113,11 @@ export interface MediaDetail extends MediaItem {
   similar?: { results: MediaItem[] };
   recommendations?: { results: MediaItem[] };
   homepage?: string;
+  ratings?: {
+    imdb?: string;
+    rottenTomatoes?: string;
+    metacritic?: string;
+  };
 }
 
 // Gemini AI Types

@@ -41,14 +41,22 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded }) => {
     setStep(2);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedList) return;
 
+    // Save locally
     storageService.addCustomList({
       traktList: selectedList,
       customName: customName || selectedList.name,
       thumbnailUrl: thumbnailUrl || undefined,
     });
+
+    // Sync: Like the list on Trakt so it appears on other devices
+    try {
+        await storageService.toggleListLike(selectedList);
+    } catch (e) {
+        console.error('Failed to sync like to Trakt', e);
+    }
 
     onAdded();
     onClose();

@@ -25,6 +25,10 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
 
   useEffect(() => {
     loadLists();
+    // Trigger background sync when page loads to pull new lists from Trakt
+    storageService.fetchLists(true).then(() => {
+        loadLists(); // Reload after sync
+    });
   }, []);
 
   useEffect(() => {
@@ -55,7 +59,19 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
             <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors">
                 <ArrowLeft size={24} className="text-white" />
             </button>
-            <h1 className="text-3xl font-bold text-white">Manage Lists</h1>
+            <div className="flex-1">
+                <h1 className="text-3xl font-bold text-white">Manage Lists</h1>
+            </div>
+            <button 
+                onClick={() => {
+                    setLists([]); // Show loading state implication or just clear
+                    storageService.fetchLists(true).then(loadLists);
+                }}
+                className="p-2 hover:bg-white/10 rounded-full transition-colors text-white/50 hover:text-white"
+                title="Force Sync"
+            >
+                <Loader2 size={20} />
+            </button>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6 mb-8">
