@@ -10,9 +10,11 @@ import { sendMessageToPoe } from '../services/poe';
 
 interface BrowseProps {
   onItemClick: (item: MediaItem) => void;
+  selectedListId?: string | null;
+  onListClose?: () => void;
 }
 
-const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
+const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClose }) => {
   const [trending, setTrending] = useState<MediaItem[]>([]);
   const [nowPlayingMovies, setNowPlayingMovies] = useState<MediaItem[]>([]);
   const [popularShows, setPopularShows] = useState<MediaItem[]>([]);
@@ -25,7 +27,45 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(false);
 
-  const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large'>('medium');
+  const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large'>(storageService.getThumbnailSize());
+
+  const handleSizeChange = (size: 'small' | 'medium' | 'large') => {
+      setThumbnailSize(size);
+      storageService.setThumbnailSize(size);
+  };
+
+  // Sync viewingList with URL prop
+  useEffect(() => {
+      if (selectedListId && customLists.length > 0) {
+          // Try to find by ID first
+          let list = customLists.find(l => l.id === selectedListId);
+          
+          // If not found, try to find by slugified name (for cleaner URLs)
+          if (!list) {
+              list = customLists.find(l => {
+                  const slug = l.customName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+                  return slug === selectedListId;
+              });
+          }
+
+          if (list) {
+              setViewingList(list);
+          }
+      } else if (!selectedListId) {
+          setViewingList(null);
+      }
+  }, [selectedListId, customLists]);
+
+  const handleListClick = (list: CustomListConfig) => {
+      // Create slug from name
+      const slug = list.customName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+      window.location.hash = `#/list/${slug}`;
+  };
+
+  const handleListClose = () => {
+      window.location.hash = '#/browse';
+      if (onListClose) onListClose();
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -247,20 +287,20 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
                 items={listThumbnails} 
                 onItemClick={(item: any) => {
                     const list = customLists.find(l => l.id === item.realListId);
-                    if (list) setViewingList(list);
+                    if (list) handleListClick(list);
                 }} 
                 isPoster={false} // Use backdrop/landscape aspect ratio for lists
                 disableHoverAnimation={true}
                 thumbnailSize={thumbnailSize}
                 headerContent={
                     <div className="flex bg-white/10 rounded-lg p-1 gap-1">
-                        <button onClick={() => setThumbnailSize('small')} className={`p-1 rounded ${thumbnailSize === 'small' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Small">
+                        <button onClick={() => handleSizeChange('small')} className={`p-1 rounded ${thumbnailSize === 'small' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Small">
                             <div className="w-3 h-3 bg-current rounded-sm" />
                         </button>
-                        <button onClick={() => setThumbnailSize('medium')} className={`p-1 rounded ${thumbnailSize === 'medium' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Medium">
+                        <button onClick={() => handleSizeChange('medium')} className={`p-1 rounded ${thumbnailSize === 'medium' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Medium">
                             <div className="w-4 h-4 bg-current rounded-sm" />
                         </button>
-                        <button onClick={() => setThumbnailSize('large')} className={`p-1 rounded ${thumbnailSize === 'large' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Large">
+                        <button onClick={() => handleSizeChange('large')} className={`p-1 rounded ${thumbnailSize === 'large' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Large">
                             <div className="w-5 h-5 bg-current rounded-sm" />
                         </button>
                     </div>
@@ -281,7 +321,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
       {viewingList && (
         <ListDetailModal 
             list={viewingList} 
-            onClose={() => setViewingList(null)} 
+            onClose={handleListClose} 
             onItemClick={onItemClick}
             onListUpdated={() => {
                 refreshLists();

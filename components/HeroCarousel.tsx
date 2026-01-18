@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl, getFanArtLogo, getVideos } from '../services/api';
-import { Volume2, VolumeX, Play } from 'lucide-react';
 import YouTube, { YouTubeProps } from 'react-youtube';
 
 interface HeroCarouselProps {
@@ -13,7 +12,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
   const [activeIndex, setActiveIndex] = useState(0);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [videoKey, setVideoKey] = useState<string | null>(null);
-  const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(false);
   const playerRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -32,13 +30,19 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
   const activeItem = items && items.length > 0 ? items[activeIndex] : null;
 
   const nextSlide = () => {
+      // Clear all timers immediately to prevent race conditions
+      if (timerRef.current) clearTimeout(timerRef.current);
       setActiveIndex((prev) => (prev + 1) % items.length);
   };
+  
+  // Use a ref to track if we've already scheduled the skip for the current video
+  const skipScheduledRef = useRef(false);
 
   useEffect(() => {
     if (activeItem) {
       setLogoUrl(null);
       setVideoKey(null);
+      skipScheduledRef.current = false; // Reset skip schedule
       
       // Start a fallback timer in case video doesn't load or exist
       // We'll clear this if a video is found and starts playing
@@ -55,10 +59,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
                             videos.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube');
             if (trailer) {
                 setVideoKey(trailer.key);
-                // If we found a video, we rely on the player events (onEnd/onError) 
-                // BUT we keep the timer until the player actually reports "playing" or "ready"
-                // to avoid getting stuck on a loading spinner.
-                // Actually, safer to clear it only on 'onPlay' or 'onReady'.
             }
         });
     }
@@ -68,18 +68,60 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
     };
   }, [activeItem]);
 
+  const checkProgress = React.useCallback(() => {
+      if (playerRef.current && isPlaying) {
+          try {
+              const duration = playerRef.current.getDuration();
+              const currentTime = playerRef.current.getCurrentTime();
+              
+              // Backup check: If we are within 6 seconds of the end, force skip
+              if (duration > 0 && (duration - currentTime) < 6) {
+                  console.log(`[Carousel] Backup check hit. Remaining: ${duration - currentTime}s. Skipping.`);
+                  nextSlide();
+              }
+          } catch (e) {
+              // Ignore errors (player might not be ready)
+          }
+      }
+  }, [isPlaying, items.length]); // Dependencies
+
+  useEffect(() => {
+      let progressInterval: NodeJS.Timeout;
+      if (isPlaying) {
+          // Check frequently (every 250ms) to ensure we catch it in time
+          progressInterval = setInterval(checkProgress, 250);
+      }
+      return () => {
+          if (progressInterval) clearInterval(progressInterval);
+      };
+  }, [isPlaying, checkProgress]);
+
+  // Preload next image logic
+  useEffect(() => {
+    if (items.length > 0) {
+      const nextIndex = (activeIndex + 1) % items.length;
+      const nextItem = items[nextIndex];
+      if (nextItem && nextItem.backdrop_path) {
+        const img = new Image();
+        img.src = getImageUrl(nextItem.backdrop_path, 'original'); // High res for next
+      }
+      
+      // Also preload the one after that with lower res to warm up connection
+      const nextNextIndex = (activeIndex + 2) % items.length;
+      const nextNextItem = items[nextNextIndex];
+      if (nextNextItem && nextNextItem.backdrop_path) {
+          const imgSmall = new Image();
+          imgSmall.src = getImageUrl(nextNextItem.backdrop_path, 'w1280'); // Medium res
+      }
+    }
+  }, [activeIndex, items]);
+
   const onPlayerReady: YouTubeProps['onReady'] = (event) => {
     playerRef.current = event.target;
     
-    // Always try to play immediately when ready
+    // Always mute to comply with browser autoplay policies
+    event.target.mute();
     event.target.playVideo();
-
-    // Attempt to respect the current mute state
-    if (isMuted) {
-        event.target.mute();
-    } else {
-        event.target.unMute();
-    }
     
     // Clear fallback timer as we are ready to play
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -90,12 +132,31 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       if (event.data === 1) { // Playing
           setIsPlaying(true);
           if (timerRef.current) clearTimeout(timerRef.current);
+          
+          // Calculate precise skip time
+          const duration = event.target.getDuration();
+          if (duration > 6 && !skipScheduledRef.current) {
+              // Skip 6 seconds before the end
+              // NOTE: YouTube 'duration' is in seconds. setTimeout is in ms.
+              const skipTimeMs = (duration - 6) * 1000;
+              
+              console.log(`[Carousel] Video started. Duration: ${duration}s. Scheduling skip in ${skipTimeMs}ms`);
+
+              // Set a specific timer to skip at the end
+              timerRef.current = setTimeout(() => {
+                  console.log("[Carousel] Timer fired! Skipping slide.");
+                  nextSlide();
+              }, skipTimeMs);
+              
+              skipScheduledRef.current = true;
+          }
       }
       if (event.data === 0) { // Ended
           nextSlide();
       }
       if (event.data === -1 || event.data === 5) { // Unstarted or Cued
           // Try to force play if it gets stuck here
+          event.target.mute(); // Ensure mute
           event.target.playVideo();
       }
   };
@@ -104,29 +165,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       // If video fails, trigger next slide immediately
       if (timerRef.current) clearTimeout(timerRef.current);
       setTimeout(nextSlide, 2000);
-  };
-
-  const handleControlClick = (e: React.MouseEvent) => {
-      e.stopPropagation();
-      
-      if (!playerRef.current) return;
-
-      if (!isPlaying) {
-          // If not playing, this acts as a "Play" button
-          // We also unmute because user interaction implies they want to hear it
-          setIsMuted(false);
-          playerRef.current.unMute();
-          playerRef.current.playVideo();
-      } else {
-          // If playing, this acts as a Mute toggle
-          const newMuted = !isMuted;
-          setIsMuted(newMuted);
-          if (newMuted) {
-              playerRef.current.mute();
-          } else {
-              playerRef.current.unMute();
-          }
-      }
   };
 
   // If no items are passed at all, show a graceful placeholder
@@ -150,7 +188,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       modestbranding: 1,
       rel: 0,
       showinfo: 0,
-      mute: isMuted ? 1 : 0,
+      mute: 1, // Always mute
+      playsinline: 1,
       origin: window.location.origin
     },
   };
@@ -167,11 +206,16 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
           className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${index === activeIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
         >
-          <img
-            src={getImageUrl(item.backdrop_path, 'original')}
-            alt={item.title || item.name}
-            className={`w-full h-full object-cover transition-opacity duration-1000 ${index === activeIndex && isPlaying ? 'opacity-0' : 'opacity-100'}`}
-          />
+          {/* Only render image if it's current, next, or previous to save memory/bandwidth */}
+          {(index === activeIndex || index === (activeIndex + 1) % items.length || index === (activeIndex - 1 + items.length) % items.length) && (
+              <img
+                src={getImageUrl(item.backdrop_path, index === activeIndex ? 'original' : 'w1280')}
+                alt={item.title || item.name}
+                className={`w-full h-full object-cover transition-opacity duration-1000 ${index === activeIndex && isPlaying ? 'opacity-0' : 'opacity-100'}`}
+                loading={index === activeIndex ? "eager" : "lazy"}
+                decoding={index === activeIndex ? "sync" : "async"}
+              />
+          )}
           
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#050505]/80 via-transparent to-transparent md:via-[#050505]/20" />
@@ -194,20 +238,6 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
                 />
             </div>
           )}
-      </div>
-
-      {/* Mute/Play Button */}
-      <div className="absolute top-24 right-6 md:top-32 md:right-12 z-50">
-          <button 
-            onClick={handleControlClick}
-            className="p-3 bg-black/30 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/20 transition-all flex items-center justify-center"
-          >
-              {!isPlaying ? (
-                  <Play size={24} className="ml-1" /> // Offset slightly for visual balance
-              ) : (
-                  isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />
-              )}
-          </button>
       </div>
 
       {/* Content Layer */}

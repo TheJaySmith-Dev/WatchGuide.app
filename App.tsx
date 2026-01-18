@@ -26,11 +26,22 @@ const App: React.FC = () => {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const authProcessing = useRef(false);
 
+  const [selectedListId, setSelectedListId] = useState<string | null>(null);
+
   // Simple Hash Router Implementation
   useEffect(() => {
     const handleHashChange = () => {
-      const hash = window.location.hash.replace('#/', '') || 'browse';
-      setActiveTab(hash);
+      const hash = window.location.hash.replace('#/', '');
+      
+      // Check for list route
+      if (hash.startsWith('list/')) {
+          const listId = hash.replace('list/', '');
+          setSelectedListId(listId);
+          setActiveTab('browse'); // Keep Browse active as parent
+      } else {
+          setActiveTab(hash || 'browse');
+          setSelectedListId(null);
+      }
     };
 
     // Set initial tab based on hash
@@ -147,7 +158,7 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (activeTab) {
       case 'browse':
-        return <Browse onItemClick={handleMediaClick} />;
+        return <Browse onItemClick={handleMediaClick} selectedListId={selectedListId} onListClose={() => setSelectedListId(null)} />;
       case 'mylist':
         return <MyList onItemClick={handleMediaClick} />;
       case 'countdown':

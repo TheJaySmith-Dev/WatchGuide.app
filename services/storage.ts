@@ -408,6 +408,15 @@ class StorageService {
         }));
     }
 
+    // List Thumbnail Size Preference
+    getThumbnailSize(): 'small' | 'medium' | 'large' {
+        return (localStorage.getItem('thumbnail_size') as 'small' | 'medium' | 'large') || 'medium';
+    }
+
+    setThumbnailSize(size: 'small' | 'medium' | 'large') {
+        localStorage.setItem('thumbnail_size', size);
+    }
+
     // Force refresh from Simkl
     async refresh(): Promise<void> {
         await this.fetchLists(true);
