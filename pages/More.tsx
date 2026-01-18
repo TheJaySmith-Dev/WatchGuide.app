@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl } from '../services/api';
 import { Person, TraktUser } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { traktService } from '../services/trakt';
+import { mdblistService } from '../services/mdblist';
 import ListsPage from './ListsPage';
 
 import GuideAIPage from './GuideAIPage';
@@ -43,9 +44,11 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     const [showLists, setShowLists] = useState(false);
     const [showGuideAI, setShowGuideAI] = useState(false);
     const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+    const [mdbAuthenticated, setMdbAuthenticated] = useState(false);
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
+        setMdbAuthenticated(mdblistService.isAuthenticated());
     }, []);
 
     // Notify parent when lists view is toggled
@@ -190,13 +193,55 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             onClick={() => traktService.initiateOAuth()}
                             className="w-full flex items-center justify-between p-4 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all text-red-400 font-medium"
                         >
-                            <span>Connect Trakt Account</span>
+                            <div className="flex items-center gap-3">
+                                <img src="https://cdn.brandfetch.io/id-7yyc2jm/w/193/h/193/theme/dark/icon.png?c=1dxbfHSJFAPEGdCLU4o5B" alt="Trakt" className="w-6 h-6 rounded-full" />
+                                <span>Connect Trakt Account</span>
+                            </div>
+                            <ChevronRight size={18} />
+                        </button>
+                    )}
+
+                    {/* MDBList Integration */}
+                    {mdbAuthenticated ? (
+                        <>
+                            <div className="flex items-center gap-4 border-t border-white/10 pt-6">
+                                <img 
+                                    src="https://mdblist.com/static/mdblist_logo.png" 
+                                    alt="MDBList" 
+                                    className="w-12 h-12 rounded-full border-2 border-pink-500 bg-white" 
+                                />
+                                <div className="flex-1">
+                                    <p className="text-white font-medium">MDBList Connected</p>
+                                    <p className="text-gray-400 text-sm">Access to your MDBList lists</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        localStorage.removeItem('mdblist_access_token');
+                                        localStorage.removeItem('mdblist_refresh_token');
+                                        setMdbAuthenticated(false);
+                                        window.location.reload();
+                                    }}
+                                    className="px-4 py-2 bg-rose-600/20 border border-rose-500/30 rounded-xl hover:bg-rose-600/30 transition-all text-rose-400 text-sm font-medium"
+                                >
+                                    Logout
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => mdblistService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-pink-600/20 border border-pink-500/30 rounded-xl hover:bg-pink-600/30 transition-all text-pink-400 font-medium"
+                        >
+                            <div className="flex items-center gap-3">
+                                <img src="https://mdblist.com/static/mdblist_logo.png" alt="MDBList" className="w-6 h-6 rounded-full bg-white" />
+                                <span>Connect MDBList Account</span>
+                            </div>
                             <ChevronRight size={18} />
                         </button>
                     )}
 
                     <p className="text-gray-400 text-sm text-center">
-                        Sync your watchlists across devices automatically using Simkl or Trakt.
+                        Sync your watchlists across devices automatically using Simkl, Trakt, or MDBList.
                     </p>
                 </div>
             </div>

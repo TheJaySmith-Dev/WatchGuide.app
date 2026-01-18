@@ -1,6 +1,7 @@
-import { MediaItem, TraktList, CustomListConfig } from '../types';
+import { MediaItem, TraktList, CustomListConfig, MDBListList } from '../types';
 import { simklService } from './simkl';
 import { traktService } from './trakt';
+import { mdblistService } from './mdblist';
 
 export type ListType = 'planToWatch' | 'watched' | 'liked';
 
@@ -105,7 +106,14 @@ class StorageService {
 
             // Sync Custom Lists with Trakt Liked Lists
             if (this.cache.likedLists.length > 0) {
-                const existingIds = new Set(this.cache.customLists.map(l => l.traktList.ids.trakt));
+                const existingIds = new Set<number>();
+                this.cache.customLists.forEach(l => {
+                    if (l.traktList) {
+                        const lists = Array.isArray(l.traktList) ? l.traktList : [l.traktList];
+                        lists.forEach(t => existingIds.add(t.ids.trakt));
+                    }
+                });
+
                 let hasChanges = false;
 
                 this.cache.likedLists.forEach(list => {
@@ -262,30 +270,64 @@ class StorageService {
         this.saveLocalCustomLists();
     }
 
-    // Get Items for a specific Trakt List (with caching)
-    async getTraktListItems(listId: number): Promise<MediaItem[]> {
+    // Get Items for a specific Custom List Config (handles merged lists)
+    async getListItems(config: CustomListConfig): Promise<MediaItem[]> {
+        const traktLists = Array.isArray(config.traktList) ? config.traktList : [config.traktList];
+        const mdbLists = config.mdblistList ? (Array.isArray(config.mdblistList) ? config.mdblistList : [config.mdblistList]) : [];
+        
+        const traktIds = traktLists.map(l => l.ids.trakt);
+        const mdbIds = mdbLists.map(l => l.id);
+        
+        const cacheKey = `trakt:${traktIds.sort().join(',')}|mdb:${mdbIds.sort().join(',')}`;
         const now = Date.now();
-        const cached = this.cache.listItems[listId];
+        const cached = this.cache.listItems[cacheKey];
 
         if (cached && (now - cached.timestamp < this.LIST_CACHE_DURATION)) {
             return cached.items;
         }
 
         try {
-            const listItems = await traktService.getListItems(listId);
-            const mediaItems = await traktService.convertToMediaItems(listItems);
+            const allItems: MediaItem[] = [];
+
+            // Fetch Trakt lists
+            const traktPromises = traktIds.map(id => traktService.getListItems(id));
+            const traktResults = await Promise.all(traktPromises);
+
+            for (const listItems of traktResults) {
+                const mediaItems = await traktService.convertToMediaItems(listItems);
+                allItems.push(...mediaItems);
+            }
+
+            // Fetch MDBList lists
+            const mdbPromises = mdbIds.map(id => mdblistService.getListItems(id));
+            const mdbResults = await Promise.all(mdbPromises);
+            
+            for (const listItems of mdbResults) {
+                allItems.push(...listItems);
+            }
+
+            // Deduplicate by ID
+            const uniqueItems = Array.from(new Map(allItems.map(item => [item.id, item])).values());
             
             // Update cache
-            this.cache.listItems[listId] = {
-                items: mediaItems,
+            this.cache.listItems[cacheKey] = {
+                items: uniqueItems,
                 timestamp: now
             };
             
-            return mediaItems;
+            return uniqueItems;
         } catch (error) {
-            console.error(`Failed to fetch items for list ${listId}`, error);
-            return cached ? cached.items : []; // Return stale data if fetch fails
+            console.error(`Failed to fetch items for list config ${config.id}`, error);
+            return cached ? cached.items : [];
         }
+    }
+
+    // Get Items for a specific Trakt List (Legacy/Single list support)
+    async getTraktListItems(listId: number): Promise<MediaItem[]> {
+        return this.getListItems({
+            id: 'legacy_temp',
+            traktList: { ids: { trakt: listId } } as TraktList
+        });
     }
 
     // Toggle list like
@@ -314,6 +356,43 @@ class StorageService {
         }
 
         return false;
+    }
+
+    // Merge custom list with another Trakt list or MDBList list
+    mergeCustomList(customListId: string, listToMerge: TraktList | MDBListList) {
+        const listIndex = this.cache.customLists.findIndex(l => l.id === customListId);
+        if (listIndex === -1) return;
+
+        const list = this.cache.customLists[listIndex];
+        
+        // Check if it is TraktList (has ids) or MDBListList
+        const isTrakt = 'ids' in listToMerge;
+        
+        if (isTrakt) {
+            const traktList = listToMerge as TraktList;
+            // Convert single traktList to array if needed
+            const currentLists = Array.isArray(list.traktList) ? list.traktList : [list.traktList];
+            
+            // Check if already merged
+            if (currentLists.some(l => l.ids.trakt === traktList.ids.trakt)) return;
+
+            this.cache.customLists[listIndex] = {
+                ...list,
+                traktList: [...currentLists, traktList]
+            };
+        } else {
+            const mdbList = listToMerge as MDBListList;
+            const currentLists = list.mdblistList ? (Array.isArray(list.mdblistList) ? list.mdblistList : [list.mdblistList]) : [];
+            
+            if (currentLists.some(l => l.id === mdbList.id)) return;
+            
+            this.cache.customLists[listIndex] = {
+                ...list,
+                mdblistList: [...currentLists, mdbList]
+            };
+        }
+        
+        this.saveLocalCustomLists();
     }
 
     // Get AI recommendations (kept for compatibility)

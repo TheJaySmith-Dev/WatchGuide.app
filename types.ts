@@ -195,9 +195,20 @@ export interface TraktListSearchResult {
   list: TraktList;
 }
 
+export interface MDBListList {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  items: number; // item_count equivalent
+  user_name: string;
+  url: string;
+}
+
 export interface CustomListConfig {
     id: string; // Unique ID for the home screen entry
-    traktList: TraktList;
+    traktList?: TraktList | TraktList[]; // Can be a single list or multiple merged lists
+    mdblistList?: MDBListList | MDBListList[]; // MDBList integration
     customName?: string;
     thumbnailUrl?: string;
     items?: MediaItem[]; // Cached items

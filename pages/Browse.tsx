@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { getTrending, getMovies, getTVShows, getRecommendations, getSimilarMedia, searchMulti } from '../services/api';
-import { MediaItem, TraktList } from '../types';
+import { MediaItem, TraktList, CustomListConfig } from '../types';
 import HeroCarousel from '../components/HeroCarousel';
 import ContentRow from '../components/ContentRow';
-import TraktListRow from '../components/TraktListRow';
+import ListDetailModal from '../components/ListDetailModal';
 import { AlertCircle, Sparkles, Loader2, ListPlus } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { sendMessageToPoe } from '../services/poe';
@@ -19,10 +19,13 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   const [topRatedMovies, setTopRatedMovies] = useState<MediaItem[]>([]);
   const [similarItems, setSimilarItems] = useState<{ title: string; items: MediaItem[] } | null>(null);
   const [aiRecommendations, setAiRecommendations] = useState<MediaItem[]>([]);
-  const [customLists, setCustomLists] = useState<import('../types').CustomListConfig[]>([]);
+  const [customLists, setCustomLists] = useState<CustomListConfig[]>([]);
+  const [viewingList, setViewingList] = useState<CustomListConfig | null>(null);
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(false);
+
+  const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large'>('medium');
 
   useEffect(() => {
     const fetchData = async () => {
@@ -177,6 +180,32 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
   // Determine Hero Items: Use Trending, fallback to Now Playing, then Popular Shows
   const heroItems = trending.length > 0 ? trending.slice(0, 10) : (nowPlayingMovies.length > 0 ? nowPlayingMovies : popularShows);
 
+  // Convert Custom Lists to MediaItem format for ContentRow
+  const listThumbnails: MediaItem[] = customLists.map(list => {
+      // Create a stable numeric ID from the string ID for the MediaItem interface
+      let hash = 0;
+      for (let i = 0; i < list.id.length; i++) {
+          hash = (hash << 5) - hash + list.id.charCodeAt(i);
+          hash |= 0;
+      }
+      const numericId = Math.abs(hash);
+
+      return {
+          id: numericId,
+          title: list.customName,
+          name: list.customName,
+          poster_path: list.thumbnailUrl || null,
+          backdrop_path: list.thumbnailUrl || null,
+          overview: '',
+          media_type: 'person', // Use 'person' or any type to pass validation, we handle click separately
+          // Store original ID in a way we can retrieve it? 
+          // Actually we can just find the list by numericId matching in the click handler if we replicate logic,
+          // OR we can just find by title if unique, OR just trust the index if we pass index to click?
+          // ContentRow passes the item back. We can attach the real ID as a custom property casted.
+          realListId: list.id
+      } as any;
+  });
+
   return (
     <div className="pb-24 md:pb-0">
       <HeroCarousel items={heroItems} onItemClick={onItemClick} />
@@ -211,14 +240,33 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
           </div>
         )}
 
-        {/* Custom Lists */}
-        {customLists.map(list => (
-            <TraktListRow 
-              key={list.id} 
-              list={{...list.traktList, name: list.customName || list.traktList.name}} // Override name for display
-              onItemClick={onItemClick}
+        {/* Custom Lists Row */}
+        {listThumbnails.length > 0 && (
+            <ContentRow 
+                title="Your Lists" 
+                items={listThumbnails} 
+                onItemClick={(item: any) => {
+                    const list = customLists.find(l => l.id === item.realListId);
+                    if (list) setViewingList(list);
+                }} 
+                isPoster={false} // Use backdrop/landscape aspect ratio for lists
+                disableHoverAnimation={true}
+                thumbnailSize={thumbnailSize}
+                headerContent={
+                    <div className="flex bg-white/10 rounded-lg p-1 gap-1">
+                        <button onClick={() => setThumbnailSize('small')} className={`p-1 rounded ${thumbnailSize === 'small' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Small">
+                            <div className="w-3 h-3 bg-current rounded-sm" />
+                        </button>
+                        <button onClick={() => setThumbnailSize('medium')} className={`p-1 rounded ${thumbnailSize === 'medium' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Medium">
+                            <div className="w-4 h-4 bg-current rounded-sm" />
+                        </button>
+                        <button onClick={() => setThumbnailSize('large')} className={`p-1 rounded ${thumbnailSize === 'large' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Large">
+                            <div className="w-5 h-5 bg-current rounded-sm" />
+                        </button>
+                    </div>
+                }
             />
-        ))}
+        )}
 
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />
@@ -229,6 +277,20 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick }) => {
         <ContentRow title="Popular TV Shows" items={popularShows} onItemClick={onItemClick} isPoster={false} />
         <ContentRow title="Critically Acclaimed Movies" items={topRatedMovies} onItemClick={onItemClick} isPoster={true} />
       </div>
+
+      {viewingList && (
+        <ListDetailModal 
+            list={viewingList} 
+            onClose={() => setViewingList(null)} 
+            onItemClick={onItemClick}
+            onListUpdated={() => {
+                refreshLists();
+                // Update viewing list ref
+                const updated = storageService.getCustomLists().find(l => l.id === viewingList.id);
+                if (updated) setViewingList(updated);
+            }}
+        />
+      )}
     </div>
   );
 };

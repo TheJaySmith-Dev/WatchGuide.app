@@ -5,6 +5,7 @@ import { CustomListConfig, MediaItem } from '../types';
 import AddListModal from '../components/AddListModal';
 import { getImageUrl } from '../services/api';
 import MediaDetailView from '../components/MediaDetailView';
+import ListDetailModal from '../components/ListDetailModal';
 
 interface ListsPageProps {
   onBack: () => void;
@@ -15,8 +16,6 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
   const [lists, setLists] = useState<CustomListConfig[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewingList, setViewingList] = useState<CustomListConfig | null>(null);
-  const [listItems, setListItems] = useState<MediaItem[]>([]);
-  const [loadingItems, setLoadingItems] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
   const loadLists = () => {
@@ -30,18 +29,6 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
         loadLists(); // Reload after sync
     });
   }, []);
-
-  useEffect(() => {
-    if (viewingList) {
-      setLoadingItems(true);
-      storageService.getTraktListItems(viewingList.traktList.ids.trakt)
-        .then(setListItems)
-        .catch(console.error)
-        .finally(() => setLoadingItems(false));
-    } else {
-      setListItems([]);
-    }
-  }, [viewingList]);
 
   const handleRemove = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -126,47 +113,17 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
 
       {/* List Viewer Modal */}
       {viewingList && (
-        <div className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md flex flex-col animate-fade-in">
-            <div className="p-6 md:p-10 border-b border-white/10 flex items-center justify-between bg-black/50">
-                <div>
-                    <h2 className="text-3xl font-bold text-white mb-1">{viewingList.customName}</h2>
-                    <p className="text-gray-400">From {viewingList.traktList.name} ({viewingList.traktList.item_count} items)</p>
-                </div>
-                <button onClick={() => setViewingList(null)} className="p-2 hover:bg-white/10 rounded-full text-white">
-                    <X size={32} />
-                </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 md:p-10">
-                {loadingItems ? (
-                    <div className="flex justify-center items-center h-64">
-                        <Loader2 className="animate-spin text-indigo-500" size={48} />
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-6">
-                        {listItems.map(item => (
-                            <div 
-                                key={item.id} 
-                                onClick={() => setSelectedMedia(item)}
-                                className="group cursor-pointer space-y-2"
-                            >
-                                <div className="aspect-[2/3] rounded-xl overflow-hidden border border-white/10 relative">
-                                    <img 
-                                        src={getImageUrl(item.poster_path, 'w500')} 
-                                        alt={item.title || item.name} 
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                    />
-                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
-                                </div>
-                                <h3 className="text-white font-medium text-sm line-clamp-2 group-hover:text-indigo-400 transition-colors">
-                                    {item.title || item.name}
-                                </h3>
-                            </div>
-                        ))}
-                    </div>
-                )}
-            </div>
-        </div>
+        <ListDetailModal
+            list={viewingList}
+            onClose={() => setViewingList(null)}
+            onItemClick={setSelectedMedia}
+            onListUpdated={() => {
+                loadLists();
+                // Update viewing list ref
+                const updated = storageService.getCustomLists().find(l => l.id === viewingList.id);
+                if (updated) setViewingList(updated);
+            }}
+        />
       )}
 
       {selectedMedia && (

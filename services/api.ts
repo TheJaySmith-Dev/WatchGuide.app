@@ -53,6 +53,7 @@ const FALLBACK_DATA: MediaItem[] = [
 
 export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w185' = 'w500') => {
   if (!path) return 'https://via.placeholder.com/500x750?text=No+Image';
+  if (path.startsWith('http')) return path; // Return full URLs as is
   return `${IMAGE_BASE_URL}/${size}${path}`;
 };
 
@@ -192,6 +193,13 @@ export const getRecommendations = async (type: 'movie' | 'tv', id: number): Prom
   try {
     const data = await fetchTMDB<{ results: MediaItem[] }>(`/${type}/${id}/recommendations`);
     return (data.results || []).map(item => ({ ...item, media_type: type }));
+  } catch { return []; }
+};
+
+export const getVideos = async (type: 'movie' | 'tv', id: number): Promise<any[]> => {
+  try {
+    const data = await fetchTMDB<{ results: any[] }>(`/${type}/${id}/videos`);
+    return data.results || [];
   } catch { return []; }
 };
 

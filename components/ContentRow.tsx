@@ -10,9 +10,20 @@ interface ContentRowProps {
   onItemClick: (item: MediaItem) => void;
   hideTitle?: boolean;
   headerContent?: React.ReactNode;
+  disableHoverAnimation?: boolean;
+  thumbnailSize?: 'small' | 'medium' | 'large';
 }
 
-const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, onItemClick, hideTitle = false, headerContent }) => {
+const ContentRow: React.FC<ContentRowProps> = ({ 
+    title, 
+    items, 
+    isPoster = true, 
+    onItemClick, 
+    hideTitle = false, 
+    headerContent,
+    disableHoverAnimation = false,
+    thumbnailSize = 'medium'
+}) => {
   const rowRef = useRef<HTMLDivElement>(null);
 
   const scroll = (direction: 'left' | 'right') => {
@@ -27,6 +38,22 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
   if (!items || !Array.isArray(items) || items.length === 0) {
     return null;
   }
+  
+  const getSizeClass = () => {
+      if (isPoster) {
+          switch(thumbnailSize) {
+              case 'small': return 'w-[100px] md:w-[140px]';
+              case 'large': return 'w-[180px] md:w-[260px]';
+              default: return 'w-[140px] md:w-[200px]';
+          }
+      } else {
+          switch(thumbnailSize) {
+              case 'small': return 'w-[200px] md:w-[280px]';
+              case 'large': return 'w-[320px] md:w-[450px]';
+              default: return 'w-[260px] md:w-[350px]';
+          }
+      }
+  };
 
   return (
     <div className="py-2 space-y-4 group/row">
@@ -49,8 +76,11 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
       >
         {items.map((item, index) => {
           // Explicitly construct className to avoid template literal issues
-          let className = "flex-none relative cursor-pointer group transition-all duration-300 hover:scale-105 hover:z-10 snap-center ";
-          className += isPoster ? "w-[140px] md:w-[200px] " : "w-[260px] md:w-[350px] ";
+          let className = `flex-none relative cursor-pointer group transition-all duration-300 snap-center ${getSizeClass()} `;
+          
+          if (!disableHoverAnimation) {
+              className += "hover:scale-105 hover:z-10 ";
+          }
 
           if (index === 0) className += "md:ml-40 ";
           if (index === items.length - 1) className += "md:mr-12 ";
@@ -65,12 +95,12 @@ const ContentRow: React.FC<ContentRowProps> = ({ title, items, isPoster = true, 
                 <img
                   src={getImageUrl(isPoster ? item.poster_path : item.backdrop_path, 'w500')}
                   alt={item.title || item.name}
-                  className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                  className={`w-full h-full object-cover transition-transform duration-500 ${!disableHoverAnimation ? 'group-hover:scale-110' : ''}`}
                   loading="lazy"
                 />
-                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+                <div className={`absolute inset-0 bg-black/0 transition-colors ${!disableHoverAnimation ? 'group-hover:bg-black/20' : ''}`} />
 
-                <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end">
+                <div className={`absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/90 to-transparent opacity-0 transition-opacity flex flex-col justify-end ${!disableHoverAnimation ? 'group-hover:opacity-100' : 'group-hover:opacity-100'}`}>
                   <h3 className="text-sm font-bold text-white line-clamp-2">{item.title || item.name}</h3>
                   {item.vote_average && (
                     <span className="text-xs text-green-400 font-medium mt-1">{(item.vote_average * 10).toFixed(0)}% Match</span>

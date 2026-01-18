@@ -11,6 +11,7 @@ import CollectionDetailView from './components/CollectionDetailView';
 import OnboardingTour from './components/OnboardingTour';
 import { simklService } from './services/simkl';
 import { traktService } from './services/trakt';
+import { mdblistService } from './services/mdblist';
 import { MediaItem, SimklUser, TraktUser } from './types';
 
 const App: React.FC = () => {
@@ -71,6 +72,19 @@ const App: React.FC = () => {
                 traktService.getCurrentUser().then(setTraktUser);
             } else {
                 alert('Failed to connect to Trakt.');
+            }
+            localStorage.removeItem('auth_provider_pending');
+            authProcessing.current = false;
+          });
+      } else if (provider === 'mdblist') {
+          mdblistService.handleCallback(code).then(success => {
+            const currentHash = window.location.hash || `#/${activeTab}`;
+            window.history.replaceState({}, document.title, window.location.pathname + currentHash);
+            
+            if (success) {
+                alert('Successfully connected to MDBList!');
+            } else {
+                alert('Failed to connect to MDBList.');
             }
             localStorage.removeItem('auth_provider_pending');
             authProcessing.current = false;
