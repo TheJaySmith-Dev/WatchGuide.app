@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { MediaItem } from '../types';
 import { getImageUrl, getFanArtLogo, getVideos } from '../services/api';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX, Play } from 'lucide-react';
 import YouTube, { YouTubeProps } from 'react-youtube';
 
 interface HeroCarouselProps {
@@ -70,6 +70,10 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
 
   const onPlayerReady: YouTubeProps['onReady'] = (event) => {
     playerRef.current = event.target;
+    
+    // Always try to play immediately when ready
+    event.target.playVideo();
+
     // Attempt to respect the current mute state
     if (isMuted) {
         event.target.mute();
@@ -78,13 +82,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
     }
     
     // Clear fallback timer as we are ready to play
-    // But better to clear on 'onPlay' to be sure it actually started?
-    // Let's clear here to give the video a chance.
     if (timerRef.current) clearTimeout(timerRef.current);
   };
 
   const onPlayerStateChange: YouTubeProps['onStateChange'] = (event) => {
-      // 1 = playing, 0 = ended, -1 = unstarted, 2 = paused
+      // 1 = playing, 0 = ended, -1 = unstarted, 2 = paused, 3 = buffering, 5 = cued
       if (event.data === 1) { // Playing
           setIsPlaying(true);
           if (timerRef.current) clearTimeout(timerRef.current);
@@ -92,21 +94,33 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       if (event.data === 0) { // Ended
           nextSlide();
       }
+      if (event.data === -1 || event.data === 5) { // Unstarted or Cued
+          // Try to force play if it gets stuck here
+          event.target.playVideo();
+      }
   };
 
   const onPlayerError: YouTubeProps['onError'] = () => {
-      // If video fails, trigger next slide immediately (or let fallback timer handle it)
+      // If video fails, trigger next slide immediately
       if (timerRef.current) clearTimeout(timerRef.current);
-      // Give it a small delay so it doesn't flash
       setTimeout(nextSlide, 2000);
   };
 
-  const toggleMute = (e: React.MouseEvent) => {
+  const handleControlClick = (e: React.MouseEvent) => {
       e.stopPropagation();
-      const newMuted = !isMuted;
-      setIsMuted(newMuted);
       
-      if (playerRef.current) {
+      if (!playerRef.current) return;
+
+      if (!isPlaying) {
+          // If not playing, this acts as a "Play" button
+          // We also unmute because user interaction implies they want to hear it
+          setIsMuted(false);
+          playerRef.current.unMute();
+          playerRef.current.playVideo();
+      } else {
+          // If playing, this acts as a Mute toggle
+          const newMuted = !isMuted;
+          setIsMuted(newMuted);
           if (newMuted) {
               playerRef.current.mute();
           } else {
@@ -182,13 +196,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
           )}
       </div>
 
-      {/* Mute Button */}
+      {/* Mute/Play Button */}
       <div className="absolute top-24 right-6 md:top-32 md:right-12 z-50">
           <button 
-            onClick={toggleMute}
-            className="p-3 bg-black/30 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/20 transition-all"
+            onClick={handleControlClick}
+            className="p-3 bg-black/30 backdrop-blur-md border border-white/10 rounded-full text-white hover:bg-white/20 transition-all flex items-center justify-center"
           >
-              {isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />}
+              {!isPlaying ? (
+                  <Play size={24} className="ml-1" /> // Offset slightly for visual balance
+              ) : (
+                  isMuted ? <VolumeX size={24} /> : <Volume2 size={24} />
+              )}
           </button>
       </div>
 
