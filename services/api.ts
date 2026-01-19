@@ -1,6 +1,6 @@
-import { MediaItem, MediaDetail, Person, CollectionDetail } from '../types';
+import { MediaItem, MediaDetail, Person, CollectionDetail, Season } from '../types';
 
-const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
+const TMDB_API_KEY = 'e02377773227a77d677685608266224e'; // Using provided key
 const OMDB_API_KEY = 'c60b7091';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
@@ -195,6 +195,15 @@ export const getTrendingPeople = async (): Promise<Person[]> => {
 
 export const getPersonDetails = async (id: number): Promise<Person> => {
   return fetchTMDB<Person>(`/person/${id}`, { append_to_response: 'combined_credits,external_ids,images' });
+};
+
+export const getSeasonDetails = async (tvId: number, seasonNumber: number): Promise<Season> => {
+  try {
+    return await fetchTMDB<Season>(`/tv/${tvId}/season/${seasonNumber}`);
+  } catch (e) {
+    console.error(`Failed to fetch season ${seasonNumber} for tv ${tvId}`, e);
+    throw e;
+  }
 };
 
 export const getRecommendations = async (type: 'movie' | 'tv', id: number): Promise<MediaItem[]> => {

@@ -94,6 +94,28 @@ export interface CollectionDetail {
   parts: MediaItem[];
 }
 
+export interface Episode {
+  id: number;
+  name: string;
+  overview: string;
+  still_path: string | null;
+  air_date: string;
+  episode_number: number;
+  vote_average: number;
+  runtime?: number;
+}
+
+export interface Season {
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  season_number: number;
+  episode_count: number;
+  air_date: string;
+  episodes?: Episode[];
+}
+
 export interface MediaDetail extends MediaItem {
   credits?: Credits;
   runtime?: number;
@@ -111,6 +133,7 @@ export interface MediaDetail extends MediaItem {
   revenue?: number;
   budget?: number;
   belongs_to_collection?: Collection;
+  seasons?: Season[];
   similar?: { results: MediaItem[] };
   recommendations?: { results: MediaItem[] };
   homepage?: string;
