@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { searchMulti, getGenres, discoverMedia } from '../services/api';
+import { searchMulti, getGenres, discoverMedia, getTrending, getFeaturedCollections, getImageUrl } from '../services/api';
 import { MediaItem } from '../types';
-import { Search as SearchIcon, Filter, X } from 'lucide-react';
+import { Search as SearchIcon, Filter, X, TrendingUp, Library, Film, Tv, User } from 'lucide-react';
 
 interface SearchProps {
     onItemClick: (item: MediaItem) => void;
@@ -12,6 +12,10 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
   const [results, setResults] = useState<MediaItem[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   
+  // Default Content
+  const [trending, setTrending] = useState<MediaItem[]>([]);
+  const [collections, setCollections] = useState<MediaItem[]>([]);
+
   // Filters
   const [showFilters, setShowFilters] = useState(false);
   const [activeType, setActiveType] = useState<'movie' | 'tv'>('movie');
@@ -19,14 +23,33 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [genres, setGenres] = useState<{ id: number; name: string }[]>([]);
 
-  // Load genres
+  // Load genres and default content
   useEffect(() => {
       getGenres(activeType).then(setGenres);
+      
+      // Load trending and collections only once
+      if (trending.length === 0) {
+          Promise.all([
+              getTrending(),
+              getFeaturedCollections()
+          ]).then(([trend, coll]) => {
+              setTrending(trend.slice(0, 10));
+              setCollections(coll);
+          });
+      }
   }, [activeType]);
 
   // Handle Search & Filter Logic
   useEffect(() => {
     const fetchData = async () => {
+        // Only search if there's a query OR active filters
+        // If neither, we show the default view (handled in render)
+        if (query.trim().length <= 2 && !selectedGenre && !selectedYear) {
+            setResults([]);
+            setIsSearching(false);
+            return;
+        }
+
         setIsSearching(true);
         setResults([]);
         try {
@@ -35,7 +58,7 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                 const data = await searchMulti(query);
                 setResults(data);
             } 
-            // Mode 2: Filter/Discover (Only if query is empty)
+            // Mode 2: Filter/Discover (Only if query is empty but filters active)
             else if (selectedGenre || selectedYear) {
                 const data = await discoverMedia(activeType, {
                     genre: selectedGenre || undefined,
@@ -43,10 +66,6 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                     sortBy: 'popularity.desc'
                 });
                 setResults(data);
-            }
-            // Mode 3: Empty State
-            else {
-                setResults([]);
             }
         } catch (e) {
             console.error(e);
@@ -157,12 +176,12 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
             </div>
         )}
 
-        {/* Results */}
+        {/* Results or Default View */}
         {isSearching ? (
              <div className="flex justify-center py-20">
                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
              </div>
-        ) : (
+        ) : results.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-6">
                 {results.map((item) => (
                     <div 
@@ -171,7 +190,7 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                         className="group cursor-pointer flex flex-col"
                     >
                         <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-gray-800 border border-white/5">
-                             {item.media_type === 'person' ? (
+                            {item.media_type === 'person' ? (
                                 <img
                                     src={getImageUrl(item.profile_path)}
                                     alt={item.name}
@@ -198,18 +217,65 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                     </div>
                 ))}
             </div>
-        )}
+        ) : !query && !selectedGenre && !selectedYear ? (
+            <div className="space-y-12 animate-in fade-in duration-500">
+                {/* Featured Collections */}
+                {collections.length > 0 && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-6">
+                            <Library className="text-indigo-400" size={24} />
+                            <h2 className="text-xl font-bold text-white">Featured Collections</h2>
+                        </div>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {collections.slice(0, 4).map(item => (
+                                <div 
+                                    key={item.id}
+                                    onClick={() => onItemClick(item)} // This needs to handle collection click properly
+                                    className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer border border-white/10"
+                                >
+                                    <img 
+                                        src={getImageUrl(item.backdrop_path || item.poster_path)} 
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        alt={item.name}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex items-end p-4">
+                                        <h3 className="font-bold text-white group-hover:text-indigo-400 transition-colors">{item.name}</h3>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
-        {!isSearching && results.length === 0 && query.length > 0 && (
+                {/* Trending Now */}
+                <div>
+                    <div className="flex items-center gap-2 mb-6">
+                        <TrendingUp className="text-rose-400" size={24} />
+                        <h2 className="text-xl font-bold text-white">Trending Now</h2>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                        {trending.map((item) => (
+                            <div 
+                                key={item.id} 
+                                onClick={() => onItemClick(item)}
+                                className="group cursor-pointer flex flex-col"
+                            >
+                                <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-gray-800 border border-white/5 shadow-lg group-hover:shadow-rose-500/20 transition-all duration-300 group-hover:scale-[1.02]">
+                                    <img 
+                                        src={getImageUrl(item.poster_path)} 
+                                        alt={item.title || item.name} 
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                <h3 className="font-medium text-white group-hover:text-rose-400 transition-colors line-clamp-1">{item.title || item.name}</h3>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        ) : (
             <div className="text-center text-gray-500 mt-20">
                 No results found for "{query}"
-            </div>
-        )}
-
-        {!isSearching && query.length === 0 && (
-            <div className="flex flex-col items-center justify-center text-gray-600 mt-20 space-y-4">
-                <SearchIcon size={48} className="opacity-20" />
-                <p>Find your next obsession.</p>
             </div>
         )}
       </div>

@@ -1,15 +1,16 @@
 export interface MediaItem {
   id: number;
   title?: string;
-  name?: string; // For TV shows
+  name?: string;
+  overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
-  overview: string;
-  media_type?: 'movie' | 'tv' | 'person';
+  media_type: 'movie' | 'tv' | 'person' | 'collection';
   vote_average?: number;
   release_date?: string;
   first_air_date?: string;
   genre_ids?: number[];
+  profile_path?: string | null;
   character?: string; // For cast credits
   job?: string; // For crew credits
 }

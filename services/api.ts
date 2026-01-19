@@ -254,3 +254,45 @@ export const discoverMedia = async (
     return [];
   }
 };
+
+export const getFeaturedCollections = async (): Promise<MediaItem[]> => {
+    // Curated list of popular collection IDs
+    const collectionIds = [
+        86311, // Avengers
+        10, // Star Wars
+        1241, // Harry Potter
+        2344, // The Matrix
+        638, // James Bond
+        9485, // Fast and Furious
+        87359, // Mission Impossible
+        131292 // Iron Man
+    ];
+
+    try {
+        // Fetch details for these collections
+        // We only need basic info, so we map them to MediaItem format
+        const promises = collectionIds.map(async (id) => {
+            try {
+                const data = await fetchTMDB<CollectionDetail>(`/collection/${id}`);
+                return {
+                    id: data.id,
+                    title: data.name,
+                    name: data.name,
+                    poster_path: data.poster_path,
+                    backdrop_path: data.backdrop_path,
+                    media_type: 'collection' as const,
+                    overview: data.overview || '',
+                    vote_average: 0 // Collections don't have a single vote average usually
+                } as MediaItem;
+            } catch {
+                return null;
+            }
+        });
+
+        const results = await Promise.all(promises);
+        return results.filter(Boolean) as MediaItem[];
+    } catch (e) {
+        console.error('Failed to fetch featured collections', e);
+        return [];
+    }
+};
