@@ -217,3 +217,40 @@ export const getSimilarMedia = async (type: 'movie' | 'tv', id: number): Promise
     return (data.results || []).map(item => ({ ...item, media_type: type }));
   } catch { return []; }
 };
+
+export const getGenres = async (type: 'movie' | 'tv'): Promise<{ id: number; name: string }[]> => {
+  try {
+    const data = await fetchTMDB<{ genres: { id: number; name: string }[] }>(`/genre/${type}/list`);
+    return data.genres || [];
+  } catch { return []; }
+};
+
+export const discoverMedia = async (
+  type: 'movie' | 'tv', 
+  filters: { 
+    genre?: number; 
+    year?: number; 
+    sortBy?: string;
+  }
+): Promise<MediaItem[]> => {
+  try {
+    const params: Record<string, string> = {};
+    if (filters.genre) params.with_genres = filters.genre.toString();
+    
+    if (filters.year) {
+        if (type === 'movie') {
+            params.primary_release_year = filters.year.toString();
+        } else {
+            params.first_air_date_year = filters.year.toString();
+        }
+    }
+    
+    if (filters.sortBy) params.sort_by = filters.sortBy;
+
+    const data = await fetchTMDB<{ results: MediaItem[] }>(`/discover/${type}`, params);
+    return (data.results || []).map(item => ({ ...item, media_type: type }));
+  } catch (e) {
+    console.error('Discover failed', e);
+    return [];
+  }
+};
