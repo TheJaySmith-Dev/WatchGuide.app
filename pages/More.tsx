@@ -136,44 +136,44 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             {/* Removed per user request */}
 
             {/* Stats Widgets */}
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-8">
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
-                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
-                        <Film size={20} />
-                    </div>
-                    <div className="text-left">
-                        <span className="block text-2xl font-bold text-white">{stats.movies}</span>
-                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Movies</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
-                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
-                        <Tv size={20} />
-                    </div>
-                    <div className="text-left">
-                        <span className="block text-2xl font-bold text-white">{stats.shows}</span>
-                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Shows</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
-                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
-                        <Clock size={20} />
-                    </div>
-                    <div className="text-left">
-                        <span className="block text-2xl font-bold text-white">{stats.hours}h</span>
-                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Time</span>
-                    </div>
-                </div>
-                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
-                    <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
-                        <PieChart size={20} />
-                    </div>
-                    <div className="text-left">
-                        <span className="block text-xl font-bold text-white line-clamp-1 max-w-[100px]">{stats.topGenre}</span>
-                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Top Genre</span>
-                    </div>
-                </div>
-            </div>
+                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 md:gap-4 mb-8">
+                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
+                                <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 mb-2 md:mb-0">
+                                    <Film size={20} />
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.movies}</span>
+                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Movies</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
+                                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400 mb-2 md:mb-0">
+                                    <Tv size={20} />
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.shows}</span>
+                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Shows</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
+                                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 mb-2 md:mb-0">
+                                    <Clock size={20} />
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.hours}h</span>
+                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Time</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
+                                <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400 mb-2 md:mb-0">
+                                    <PieChart size={20} />
+                                </div>
+                                <div className="text-center md:text-left">
+                                    <span className="block text-lg md:text-xl font-bold text-white line-clamp-1 max-w-[80px] md:max-w-[100px]">{stats.topGenre}</span>
+                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Top Genre</span>
+                                </div>
+                            </div>
+                        </div>
 
             {/* Features Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
