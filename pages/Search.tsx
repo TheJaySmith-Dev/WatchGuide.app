@@ -217,125 +217,63 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                     </div>
                 ))}
             </div>
-        ) : null}
-
-        {!isSearching && results.length === 0 && query.length === 0 && !selectedGenre && !selectedYear && (
-            <div className="space-y-8 animate-in fade-in duration-500">
-                
-                {/* Bento Grid Layout */}
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 auto-rows-[180px]">
-                    
-                    {/* Header Widget */}
-                    <div className="col-span-2 md:col-span-4 lg:col-span-4 row-span-1 bg-gradient-to-br from-indigo-600 to-violet-700 rounded-3xl p-8 flex flex-col justify-center relative overflow-hidden group cursor-default">
-                        <div className="relative z-10">
-                            <h2 className="text-3xl font-bold text-white mb-2">Discovery Hub</h2>
-                            <p className="text-indigo-100 max-w-md">Explore trending movies, curated collections, and find your next favorite story.</p>
+        ) : !query && !selectedGenre && !selectedYear ? (
+            <div className="space-y-12 animate-in fade-in duration-500">
+                {/* Featured Collections */}
+                {collections.length > 0 && (
+                    <div>
+                        <div className="flex items-center gap-2 mb-6">
+                            <Library className="text-indigo-400" size={24} />
+                            <h2 className="text-xl font-bold text-white">Featured Collections</h2>
                         </div>
-                        <SearchIcon className="absolute -right-8 -bottom-8 text-white/10 w-48 h-48 rotate-12" />
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {collections.slice(0, 4).map(item => (
+                                <div 
+                                    key={item.id}
+                                    onClick={() => onItemClick(item)} // This needs to handle collection click properly
+                                    className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer border border-white/10"
+                                >
+                                    <img 
+                                        src={getImageUrl(item.backdrop_path || item.poster_path)} 
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                        alt={item.name}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex items-end p-4">
+                                        <h3 className="font-bold text-white group-hover:text-indigo-400 transition-colors">{item.name}</h3>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     </div>
+                )}
 
-                    {/* Quick Filter: Action */}
-                    <div 
-                        onClick={() => setSelectedGenre(28)}
-                        className="col-span-1 row-span-1 bg-gray-800 rounded-3xl p-6 relative overflow-hidden cursor-pointer group hover:ring-2 hover:ring-indigo-500 transition-all"
-                    >
-                         <img src="https://image.tmdb.org/t/p/w500/path/to/action.jpg" className="absolute inset-0 w-full h-full object-cover opacity-40 group-hover:scale-110 transition-transform duration-700" alt="" />
-                         <div className="absolute inset-0 bg-gradient-to-t from-black/80 to-transparent" />
-                         <span className="absolute bottom-4 left-4 font-bold text-lg text-white">Action</span>
+                {/* Trending Now */}
+                <div>
+                    <div className="flex items-center gap-2 mb-6">
+                        <TrendingUp className="text-rose-400" size={24} />
+                        <h2 className="text-xl font-bold text-white">Trending Now</h2>
                     </div>
-
-                     {/* Quick Filter: Comedy */}
-                     <div 
-                        onClick={() => setSelectedGenre(35)}
-                        className="col-span-1 row-span-1 bg-gray-800 rounded-3xl p-6 relative overflow-hidden cursor-pointer group hover:ring-2 hover:ring-indigo-500 transition-all"
-                    >
-                         <div className="absolute inset-0 bg-gradient-to-br from-yellow-500 to-orange-600 opacity-80" />
-                         <span className="absolute bottom-4 left-4 font-bold text-lg text-white">Comedy</span>
-                         <span className="absolute top-4 right-4 text-4xl opacity-50">😂</span>
-                    </div>
-
-                    {/* Featured Collection: Large Tile (Star Wars/Avengers etc) */}
-                    {collections.length > 0 && (
-                        <div 
-                            onClick={() => onItemClick(collections[0])}
-                            className="col-span-2 row-span-2 rounded-3xl relative overflow-hidden cursor-pointer group"
-                        >
-                            <img 
-                                src={getImageUrl(collections[0].backdrop_path || collections[0].poster_path)} 
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                alt={collections[0].name}
-                            />
-                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
-                            <div className="absolute bottom-6 left-6 right-6">
-                                <span className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2 block">Featured Collection</span>
-                                <h3 className="text-2xl font-bold text-white">{collections[0].name}</h3>
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
+                        {trending.map((item) => (
+                            <div 
+                                key={item.id} 
+                                onClick={() => onItemClick(item)}
+                                className="group cursor-pointer flex flex-col"
+                            >
+                                <div className="relative aspect-[2/3] rounded-xl overflow-hidden mb-3 bg-gray-800 border border-white/5 shadow-lg group-hover:shadow-rose-500/20 transition-all duration-300 group-hover:scale-[1.02]">
+                                    <img 
+                                        src={getImageUrl(item.poster_path)} 
+                                        alt={item.title || item.name} 
+                                        className="w-full h-full object-cover"
+                                    />
+                                </div>
+                                <h3 className="font-medium text-white group-hover:text-rose-400 transition-colors line-clamp-1">{item.title || item.name}</h3>
                             </div>
-                        </div>
-                    )}
-
-                    {/* Trending Items (Small Tiles) */}
-                    {trending.slice(0, 4).map((item) => (
-                         <div 
-                            key={item.id}
-                            onClick={() => onItemClick(item)}
-                            className="col-span-1 row-span-2 rounded-3xl relative overflow-hidden cursor-pointer group"
-                        >
-                            <img 
-                                src={getImageUrl(item.poster_path)} 
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                alt={item.title || item.name}
-                            />
-                             <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                             <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <p className="font-bold text-white text-sm line-clamp-2">{item.title || item.name}</p>
-                             </div>
-                        </div>
-                    ))}
-
-                    {/* Quick Filter: Sci-Fi */}
-                    <div 
-                        onClick={() => setSelectedGenre(878)}
-                        className="col-span-1 row-span-1 bg-gray-800 rounded-3xl p-6 relative overflow-hidden cursor-pointer group hover:ring-2 hover:ring-indigo-500 transition-all"
-                    >
-                         <div className="absolute inset-0 bg-gradient-to-br from-blue-600 to-cyan-500 opacity-80" />
-                         <span className="absolute bottom-4 left-4 font-bold text-lg text-white">Sci-Fi</span>
-                         <span className="absolute top-4 right-4 text-4xl opacity-50">👽</span>
+                        ))}
                     </div>
-
-                     {/* Quick Filter: Horror */}
-                     <div 
-                        onClick={() => setSelectedGenre(27)}
-                        className="col-span-1 row-span-1 bg-gray-800 rounded-3xl p-6 relative overflow-hidden cursor-pointer group hover:ring-2 hover:ring-indigo-500 transition-all"
-                    >
-                         <div className="absolute inset-0 bg-gradient-to-br from-red-900 to-black opacity-90" />
-                         <span className="absolute bottom-4 left-4 font-bold text-lg text-white">Horror</span>
-                         <span className="absolute top-4 right-4 text-4xl opacity-50">👻</span>
-                    </div>
-                    
-                    {/* More Collections */}
-                     {collections.slice(1, 3).map(item => (
-                        <div 
-                            key={item.id}
-                            onClick={() => onItemClick(item)}
-                            className="col-span-2 row-span-1 rounded-3xl relative overflow-hidden cursor-pointer group"
-                        >
-                            <img 
-                                src={getImageUrl(item.backdrop_path || item.poster_path)} 
-                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                                alt={item.name}
-                            />
-                            <div className="absolute inset-0 bg-black/40 group-hover:bg-black/20 transition-colors" />
-                            <div className="absolute bottom-4 left-6">
-                                <h3 className="text-lg font-bold text-white">{item.name}</h3>
-                            </div>
-                        </div>
-                    ))}
-
                 </div>
             </div>
-        )}
-
-        {!isSearching && results.length === 0 && query.length > 0 && (
+        ) : (
             <div className="text-center text-gray-500 mt-20">
                 No results found for "{query}"
             </div>
