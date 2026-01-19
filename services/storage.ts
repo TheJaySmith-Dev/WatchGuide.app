@@ -408,6 +408,19 @@ class StorageService {
         return newList;
     }
 
+    // Update a custom list
+    updateCustomList(id: string, updates: Partial<CustomListConfig>) {
+        const index = this.cache.customLists.findIndex(l => l.id === id);
+        if (index === -1) return;
+
+        this.cache.customLists[index] = {
+            ...this.cache.customLists[index],
+            ...updates
+        };
+        this.saveLocalCustomLists();
+        this.syncConfigToTrakt(); // Trigger sync
+    }
+
     // Remove a custom list
     removeCustomList(id: string) {
         this.cache.customLists = this.cache.customLists.filter(l => l.id !== id);

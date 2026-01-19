@@ -3,22 +3,25 @@ import { Search, Plus, Save, X, Image as ImageIcon, Loader2, Database } from 'lu
 import { traktService } from '../services/trakt';
 import { mdblistService } from '../services/mdblist';
 import { storageService } from '../services/storage';
-import { TraktList, MDBListList } from '../types';
+import { TraktList, MDBListList, CustomListConfig } from '../types';
 
 interface AddListModalProps {
   onClose: () => void;
   onAdded: () => void;
-  mode?: 'create' | 'merge';
+  mode?: 'create' | 'merge' | 'edit';
   targetListId?: string;
+  existingConfig?: CustomListConfig;
 }
 
-const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'create', targetListId }) => {
-  const [step, setStep] = useState<1 | 2>(1);
+const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'create', targetListId, existingConfig }) => {
+  const [step, setStep] = useState<1 | 2>(existingConfig ? 2 : 1);
   const [provider, setProvider] = useState<'trakt' | 'mdblist'>('trakt');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<(TraktList | MDBListList)[]>([]);
   const [searching, setSearching] = useState(false);
-  const [selectedList, setSelectedList] = useState<TraktList | MDBListList | null>(null);
+  const [selectedList, setSelectedList] = useState<TraktList | MDBListList | null>(
+      existingConfig ? (existingConfig.traktList ? (Array.isArray(existingConfig.traktList) ? existingConfig.traktList[0] : existingConfig.traktList) : (Array.isArray(existingConfig.mdblistList) ? existingConfig.mdblistList[0] : existingConfig.mdblistList) || null) : null
+  );
 
   // Load Top Lists when switching to MDBList
   React.useEffect(() => {
@@ -32,9 +35,9 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
   }, [provider]);
   
   // Step 2 config
-  const [customName, setCustomName] = useState('');
-  const [thumbnailUrl, setThumbnailUrl] = useState('');
-  const [viewType, setViewType] = useState<'row' | 'hub'>('hub');
+  const [customName, setCustomName] = useState(existingConfig?.customName || '');
+  const [thumbnailUrl, setThumbnailUrl] = useState(existingConfig?.thumbnailUrl || '');
+  const [viewType, setViewType] = useState<'row' | 'hub'>(existingConfig?.viewType || 'hub');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,29 +83,43 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
   };
 
   const handleSave = async () => {
-    if (!selectedList) return;
+    if (!selectedList && mode !== 'edit') return;
     
-    const isTrakt = 'ids' in selectedList;
+    // For edit mode, we might not have changed the list itself, so reuse existing
+    const finalSelectedList = selectedList;
+
+    if (!finalSelectedList && mode === 'edit' && existingConfig) {
+        // Should have been set in initial state but just in case
+        return;
+    }
+    
+    if (!finalSelectedList) return;
+
+    const isTrakt = 'ids' in finalSelectedList;
 
     // Save locally
     const config: any = {
-      customName: customName || selectedList.name,
+      customName: customName || finalSelectedList.name,
       thumbnailUrl: thumbnailUrl || undefined,
       viewType: viewType,
     };
     
     if (isTrakt) {
-        config.traktList = selectedList;
+        config.traktList = finalSelectedList;
     } else {
-        config.mdblistList = selectedList;
+        config.mdblistList = finalSelectedList;
     }
     
-    storageService.addCustomList(config);
+    if (mode === 'edit' && existingConfig) {
+        storageService.updateCustomList(existingConfig.id, config);
+    } else {
+        storageService.addCustomList(config);
+    }
 
     // Sync: Like the list on Trakt so it appears on other devices (Trakt only for now)
-    if (isTrakt) {
+    if (isTrakt && mode === 'create') {
         try {
-            await storageService.toggleListLike(selectedList as TraktList);
+            await storageService.toggleListLike(finalSelectedList as TraktList);
         } catch (e) {
             console.error('Failed to sync like to Trakt', e);
         }

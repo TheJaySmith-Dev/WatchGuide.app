@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, ArrowLeft, X, Loader2 } from 'lucide-react';
+import { Plus, Trash2, ArrowLeft, X, Loader2, Edit2, Database, LayoutTemplate } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { CustomListConfig, MediaItem } from '../types';
 import AddListModal from '../components/AddListModal';
@@ -18,6 +18,7 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick, filter }) 
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewingList, setViewingList] = useState<CustomListConfig | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [editingList, setEditingList] = useState<CustomListConfig | null>(null);
 
   const loadLists = () => {
     let allLists = storageService.getCustomLists();
@@ -94,8 +95,25 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick, filter }) 
                   )}
               </div>
               
-              {/* Hover Overlay with Delete */}
-              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-end p-2">
+              {/* Hover Overlay with Actions */}
+              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-start justify-between p-2">
+                <div className="flex gap-2">
+                    <button
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setEditingList(list);
+                        }}
+                        className="p-2 bg-indigo-600/80 text-white rounded-full hover:bg-indigo-600 transition-colors"
+                        title="Edit List"
+                    >
+                        <Edit2 size={16} />
+                    </button>
+                    {/* Visual indicator of type */}
+                    <div className="p-2 bg-black/60 text-white/70 rounded-full" title={list.viewType === 'row' ? 'Row View' : 'Hub View'}>
+                        {list.viewType === 'row' ? <LayoutTemplate size={16} /> : <Database size={16} />}
+                    </div>
+                </div>
+
                 <button
                     onClick={(e) => handleRemove(e, list.id)}
                     className="p-2 bg-red-600/80 text-white rounded-full hover:bg-red-600 transition-colors"
@@ -147,6 +165,15 @@ const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick, filter }) 
           onClose={() => setShowAddModal(false)} 
           onAdded={loadLists} 
         />
+      )}
+
+      {editingList && (
+          <AddListModal
+            onClose={() => setEditingList(null)}
+            onAdded={loadLists}
+            mode="edit"
+            existingConfig={editingList}
+          />
       )}
     </div>
   );
