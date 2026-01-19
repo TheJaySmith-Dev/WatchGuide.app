@@ -4,8 +4,8 @@ import { getMediaDetails } from './api';
 const CLIENT_ID = 'QymIY4IxaJ7ifLgCAIfRi3VQMfnDBbLeVA6VJ4FS';
 const CLIENT_SECRET = 'Uap4U8Y4xuOu1JAfKKsgmUnS8SJSKDbmHzQLwTGOZ2bwuuLJY1OSArEMC2KstqCyBxhL9X4BOmt58rAPgvLzyAJhkpRmwv16NxOiKKkLMpAVu1SLhNu5XR59o0IofaB1';
 const AUTH_URL = 'https://mdblist.com/oauth/authorize/';
-const TOKEN_URL = '/mdblist-api/oauth/token/'; // Use proxy
-const API_BASE = '/mdblist-api'; // Use proxy
+const TOKEN_URL = 'https://api.mdblist.com/oauth/token/';
+const API_BASE = 'https://api.mdblist.com';
 
 const FALLBACK_LISTS = [
     { id: 18090, name: "Most Pirated Movies", items: 100, user_name: "MDBList", description: "Most downloaded movies this week" },
