@@ -94,10 +94,47 @@ class StorageService {
                             // 2. Update local items with cloud properties
                             // 3. Add any new items from cloud
                             
-                            const mergedLists = [...cloudConfig];
+                            // To properly merge, we need to match existing lists.
+                            // Since IDs might be different if created locally on different devices (crypto.randomUUID),
+                            // we should try to match by content (traktList ID or mdblist ID)
                             
-                            // We need to ensure we don't duplicate logic but we must respect cloud viewType
-                            // Since we don't have timestamps, we'll assume cloud is latest for structure
+                            const mergedLists = [...this.cache.customLists];
+                            
+                            cloudConfig.forEach((cloudList: CustomListConfig) => {
+                                // Try to find matching local list
+                                const localIndex = mergedLists.findIndex(l => {
+                                    // Match by ID first
+                                    if (l.id === cloudList.id) return true;
+                                    
+                                    // Match by Trakt List ID (single)
+                                    if (l.traktList && cloudList.traktList && !Array.isArray(l.traktList) && !Array.isArray(cloudList.traktList)) {
+                                        return (l.traktList as TraktList).ids.trakt === (cloudList.traktList as TraktList).ids.trakt;
+                                    }
+                                    
+                                    // Match by MDBList ID (single)
+                                    if (l.mdblistList && cloudList.mdblistList && !Array.isArray(l.mdblistList) && !Array.isArray(cloudList.mdblistList)) {
+                                        return (l.mdblistList as MDBListList).id === (cloudList.mdblistList as MDBListList).id;
+                                    }
+                                    
+                                    return false;
+                                });
+
+                                if (localIndex !== -1) {
+                                    // Update local with cloud properties (viewType, thumbnail, name)
+                                    // Cloud is source of truth for these settings
+                                    mergedLists[localIndex] = {
+                                        ...mergedLists[localIndex],
+                                        viewType: cloudList.viewType,
+                                        thumbnailUrl: cloudList.thumbnailUrl,
+                                        customName: cloudList.customName || mergedLists[localIndex].customName,
+                                        id: cloudList.id // Sync the ID to match cloud for future updates
+                                    };
+                                } else {
+                                    // Add new list from cloud
+                                    mergedLists.push(cloudList);
+                                }
+                            });
+                            
                             this.cache.customLists = mergedLists;
                         }
 
