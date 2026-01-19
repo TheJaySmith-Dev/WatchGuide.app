@@ -427,8 +427,11 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             )}
 
             {/* Trending People */}
-            <div className="max-w-4xl mx-auto">
-                <h2 className="text-2xl font-bold text-white mb-6">Trending People</h2>
+            <div className="max-w-4xl mx-auto mb-20 md:mb-0">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <User className="text-indigo-400" size={20} />
+                    Trending People
+                </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {people.map(person => (
                         <div
@@ -439,11 +442,11 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <img
                                 src={getImageUrl(person.profile_path, 'w500')}
                                 alt={person.name}
-                                className="w-12 h-12 rounded-full object-cover"
+                                className="w-12 h-12 rounded-full object-cover shrink-0"
                             />
-                            <div>
+                            <div className="min-w-0">
                                 <h4 className="text-sm font-semibold text-white line-clamp-1">{person.name}</h4>
-                                <span className="text-xs text-gray-400">{person.known_for_department}</span>
+                                <span className="text-xs text-gray-400 line-clamp-1">{person.known_for_department}</span>
                             </div>
                         </div>
                     ))}

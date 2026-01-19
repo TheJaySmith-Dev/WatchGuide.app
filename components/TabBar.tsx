@@ -18,8 +18,8 @@ const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, hideOnDesktop =
   return (
     <>
       {/* Mobile Floating Liquid Glass Bar */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-sm h-16 z-50 rounded-full flex items-center justify-between px-8 
-        bg-white/[0.08] backdrop-blur-sm 
+      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-sm h-16 z-[100] rounded-full flex items-center justify-between px-8 
+        bg-white/[0.08] backdrop-blur-md 
         border border-white/20 
         shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] 
         shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),inset_0_-1px_0_0_rgba(255,255,255,0.1)]"
