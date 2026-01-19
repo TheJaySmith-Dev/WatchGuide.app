@@ -255,7 +255,7 @@ export const discoverMedia = async (
   }
 };
 
-export const getFeaturedCollections = async (): Promise<MediaItem[]> => {
+export const getFeaturedCollections = async (): Promise<CollectionDetail[]> => {
     // Curated list of popular collection IDs
     const collectionIds = [
         86311, // Avengers
@@ -270,27 +270,16 @@ export const getFeaturedCollections = async (): Promise<MediaItem[]> => {
 
     try {
         // Fetch details for these collections
-        // We only need basic info, so we map them to MediaItem format
         const promises = collectionIds.map(async (id) => {
             try {
-                const data = await fetchTMDB<CollectionDetail>(`/collection/${id}`);
-                return {
-                    id: data.id,
-                    title: data.name,
-                    name: data.name,
-                    poster_path: data.poster_path,
-                    backdrop_path: data.backdrop_path,
-                    media_type: 'collection' as const,
-                    overview: data.overview || '',
-                    vote_average: 0 // Collections don't have a single vote average usually
-                } as MediaItem;
+                return await fetchTMDB<CollectionDetail>(`/collection/${id}`);
             } catch {
                 return null;
             }
         });
 
         const results = await Promise.all(promises);
-        return results.filter(Boolean) as MediaItem[];
+        return results.filter(Boolean) as CollectionDetail[];
     } catch (e) {
         console.error('Failed to fetch featured collections', e);
         return [];

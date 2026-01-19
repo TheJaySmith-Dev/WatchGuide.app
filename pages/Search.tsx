@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { searchMulti, getGenres, discoverMedia, getTrending, getFeaturedCollections, getImageUrl } from '../services/api';
-import { MediaItem } from '../types';
-import { Search as SearchIcon, Filter, X, TrendingUp, Library, Film, Tv, User } from 'lucide-react';
+import { MediaItem, CollectionDetail } from '../types';
+import { Search as SearchIcon, Filter, X, TrendingUp, Library, Film, Tv, User, ChevronRight } from 'lucide-react';
 
 interface SearchProps {
     onItemClick: (item: MediaItem) => void;
@@ -14,7 +14,7 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
   
   // Default Content
   const [trending, setTrending] = useState<MediaItem[]>([]);
-  const [collections, setCollections] = useState<MediaItem[]>([]);
+  const [collections, setCollections] = useState<CollectionDetail[]>([]);
 
   // Filters
   const [showFilters, setShowFilters] = useState(false);
@@ -226,21 +226,50 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                             <Library className="text-indigo-400" size={24} />
                             <h2 className="text-xl font-bold text-white">Featured Collections</h2>
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {collections.slice(0, 4).map(item => (
                                 <div 
                                     key={item.id}
-                                    onClick={() => onItemClick(item)} // This needs to handle collection click properly
-                                    className="group relative aspect-video rounded-xl overflow-hidden cursor-pointer border border-white/10"
+                                    className="relative rounded-2xl overflow-hidden bg-gray-800 border border-white/10 group"
                                 >
-                                    <img 
-                                        src={getImageUrl(item.backdrop_path || item.poster_path)} 
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                        alt={item.name}
-                                    />
-                                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 to-transparent flex items-end p-4">
-                                        <h3 className="font-bold text-white group-hover:text-indigo-400 transition-colors">{item.name}</h3>
+                                    {/* Collection Banner */}
+                                    <div className="relative h-48 md:h-64">
+                                        <img 
+                                            src={getImageUrl(item.backdrop_path || item.poster_path, 'original')} 
+                                            className="w-full h-full object-cover opacity-60 transition-opacity group-hover:opacity-40"
+                                            alt={item.name}
+                                        />
+                                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6">
+                                            <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">Collection</span>
+                                            <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">{item.name}</h3>
+                                            <p className="text-gray-300 text-sm line-clamp-2 max-w-lg mb-4">{item.overview}</p>
+                                        </div>
                                     </div>
+
+                                    {/* Inline Movies */}
+                                    {item.parts && item.parts.length > 0 && (
+                                        <div className="p-4 bg-black/40 backdrop-blur-sm border-t border-white/10">
+                                            <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar snap-x">
+                                                {item.parts
+                                                    .filter(p => p.release_date) // Ensure date exists
+                                                    .sort((a, b) => new Date(a.release_date!).getTime() - new Date(b.release_date!).getTime())
+                                                    .map(part => (
+                                                    <div 
+                                                        key={part.id}
+                                                        onClick={() => onItemClick({ ...part, media_type: 'movie' })}
+                                                        className="snap-start shrink-0 w-20 md:w-24 aspect-[2/3] rounded-lg overflow-hidden border border-white/10 hover:border-indigo-500 transition-all hover:scale-105 shadow-lg relative cursor-pointer group/part"
+                                                        title={part.title}
+                                                    >
+                                                        <img 
+                                                            src={getImageUrl(part.poster_path)} 
+                                                            className="w-full h-full object-cover" 
+                                                            alt={part.title}
+                                                        />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                         </div>
