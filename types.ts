@@ -95,24 +95,29 @@ export interface CollectionDetail {
 }
 
 export interface Episode {
+  air_date: string;
+  episode_number: number;
   id: number;
   name: string;
   overview: string;
+  production_code: string;
+  runtime: number | null;
+  season_number: number;
+  show_id: number;
   still_path: string | null;
-  air_date: string;
-  episode_number: number;
   vote_average: number;
-  runtime?: number;
+  vote_count: number;
 }
 
 export interface Season {
+  air_date: string;
+  episode_count: number;
   id: number;
   name: string;
   overview: string;
   poster_path: string | null;
   season_number: number;
-  episode_count: number;
-  air_date: string;
+  vote_average: number;
   episodes?: Episode[];
 }
 

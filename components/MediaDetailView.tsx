@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem, MediaDetail, Video, Person, CollectionDetail, Season } from '../types';
+import { MediaItem, MediaDetail, Video, Person, CollectionDetail, Season, Episode } from '../types';
 import { getMediaDetails, getImageUrl, getPersonDetails, getFanArtLogo, getCollectionDetails, getSeasonDetails } from '../services/api';
-import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight, ChevronDown, Tv } from 'lucide-react';
+import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight, Tv } from 'lucide-react';
 import { storageService } from '../services/storage';
 import ContentRow from './ContentRow';
+import SeasonView from './SeasonView';
 
 interface MediaDetailViewProps {
     item: MediaItem;
@@ -25,10 +26,9 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [collectionParts, setCollectionParts] = useState<MediaItem[]>([]);
     
-    // Season Logic
-    const [expandedSeason, setExpandedSeason] = useState<number | null>(null);
-    const [seasonCache, setSeasonCache] = useState<Record<number, Season>>({});
-    const [loadingSeason, setLoadingSeason] = useState<number | null>(null);
+    // Season View State
+    const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+    const [seasonEpisodes, setSeasonEpisodes] = useState<Episode[]>([]);
 
     // When item changes, reset details and fetch new ones
     useEffect(() => {
@@ -36,8 +36,8 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         setDetails(null);
         setLogoUrl(null);
         setCollectionParts([]);
-        setExpandedSeason(null);
-        setSeasonCache({});
+        setSelectedSeason(null);
+        setSeasonEpisodes([]);
         setIsPlanToWatch(storageService.isInList('planToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
@@ -70,28 +70,6 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
             setLoading(false);
         });
     }, [item]);
-
-    const toggleSeason = async (seasonNumber: number) => {
-        if (expandedSeason === seasonNumber) {
-            setExpandedSeason(null);
-            return;
-        }
-
-        setExpandedSeason(seasonNumber);
-
-        // Fetch if not cached
-        if (!seasonCache[seasonNumber]) {
-            setLoadingSeason(seasonNumber);
-            try {
-                const seasonData = await getSeasonDetails(item.id, seasonNumber);
-                setSeasonCache(prev => ({ ...prev, [seasonNumber]: seasonData }));
-            } catch (e) {
-                console.error(e);
-            } finally {
-                setLoadingSeason(null);
-            }
-        }
-    };
 
     // Use loaded details or fallback to basic item info
     const displayItem = details || item;
@@ -164,8 +142,31 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         setTimeout(() => setShowSyncPrompt(false), 3000);
     };
 
+    const handleSeasonClick = async (season: Season) => {
+        if (!details) return;
+        
+        // Fetch episodes
+        try {
+            const data = await getSeasonDetails(details.id, season.season_number);
+            if (data && data.episodes) {
+                setSeasonEpisodes(data.episodes);
+                setSelectedSeason(season);
+            }
+        } catch (error) {
+            console.error('Failed to fetch season details', error);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-hidden">
+            {selectedSeason && (
+                <SeasonView 
+                    season={selectedSeason} 
+                    episodes={seasonEpisodes} 
+                    onClose={() => setSelectedSeason(null)} 
+                />
+            )}
+
             {showSyncPrompt && (
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-3 ring-2 ring-white/20">
                     <div className="flex items-center gap-2">
@@ -376,96 +377,38 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                             </p>
                         </section>
 
-                        {/* Seasons (TV Shows Only) */}
+                        {/* Seasons (TV Only) */}
                         {details?.seasons && details.seasons.length > 0 && (
-                            <div className="space-y-4">
-                                <h3 className="text-2xl font-bold text-white mb-4">Seasons</h3>
-                                <div className="space-y-3">
-                                    {details.seasons
-                                        .filter(s => s.season_number > 0) // Filter out Season 0 (Specials) usually
-                                        .map(season => (
-                                        <div key={season.id} className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
-                                            <button
-                                                onClick={() => toggleSeason(season.season_number)}
-                                                className="w-full flex items-center gap-4 p-4 hover:bg-white/5 transition-colors text-left"
-                                            >
-                                                <div className="w-16 h-24 bg-gray-800 rounded-lg shrink-0 overflow-hidden">
-                                                    {season.poster_path ? (
-                                                        <img 
-                                                            src={getImageUrl(season.poster_path)} 
-                                                            alt={season.name} 
-                                                            className="w-full h-full object-cover"
-                                                        />
-                                                    ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs font-bold">No Image</div>
-                                                    )}
+                            <section>
+                                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                                    <Tv size={24} className="text-indigo-400" />
+                                    Seasons & Episodes
+                                </h3>
+                                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
+                                    {details.seasons.map(season => (
+                                        <div 
+                                            key={season.id} 
+                                            onClick={() => handleSeasonClick(season)}
+                                            className="snap-start shrink-0 w-40 bg-white/5 border border-white/10 rounded-xl overflow-hidden group hover:border-indigo-500 transition-colors cursor-pointer"
+                                        >
+                                            <div className="aspect-[2/3] relative">
+                                                <img 
+                                                    src={getImageUrl(season.poster_path)} 
+                                                    alt={season.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-white border border-white/10">
+                                                    {season.episode_count} Eps
                                                 </div>
-                                                <div className="flex-1">
-                                                    <h4 className="text-lg font-bold text-white">{season.name}</h4>
-                                                    <div className="flex items-center gap-3 text-sm text-gray-400 mt-1">
-                                                        <span>{season.episode_count} Episodes</span>
-                                                        <span>•</span>
-                                                        <span>{season.air_date?.split('-')[0] || 'TBA'}</span>
-                                                    </div>
-                                                </div>
-                                                <div className={`p-2 rounded-full transition-transform duration-300 ${expandedSeason === season.season_number ? 'rotate-180 bg-white/10' : ''}`}>
-                                                    <ChevronDown size={20} className="text-gray-400" />
-                                                </div>
-                                            </button>
-
-                                            {/* Episodes List */}
-                                            {expandedSeason === season.season_number && (
-                                                <div className="border-t border-white/10 bg-black/20 p-4 space-y-3 animate-in slide-in-from-top-2">
-                                                    {loadingSeason === season.season_number ? (
-                                                        <div className="flex justify-center py-8">
-                                                            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
-                                                        </div>
-                                                    ) : seasonCache[season.season_number]?.episodes ? (
-                                                        seasonCache[season.season_number].episodes!.map(episode => (
-                                                            <div key={episode.id} className="flex gap-4 p-3 rounded-xl hover:bg-white/5 transition-colors group">
-                                                                <div className="w-32 aspect-video bg-gray-800 rounded-lg shrink-0 overflow-hidden relative">
-                                                                    {episode.still_path ? (
-                                                                        <img 
-                                                                            src={getImageUrl(episode.still_path)} 
-                                                                            alt={episode.name} 
-                                                                            className="w-full h-full object-cover"
-                                                                        />
-                                                                    ) : (
-                                                                        <div className="w-full h-full flex items-center justify-center text-gray-600">
-                                                                            <Tv size={20} />
-                                                                        </div>
-                                                                    )}
-                                                                    <div className="absolute top-1 left-1 bg-black/60 px-1.5 py-0.5 rounded text-[10px] font-bold text-white">
-                                                                        Ep {episode.episode_number}
-                                                                    </div>
-                                                                </div>
-                                                                <div className="flex-1 min-w-0">
-                                                                    <div className="flex justify-between items-start gap-2">
-                                                                        <h5 className="font-bold text-white group-hover:text-indigo-400 transition-colors truncate">{episode.name}</h5>
-                                                                        {episode.vote_average > 0 && (
-                                                                            <div className="flex items-center gap-1 text-xs font-bold text-yellow-500 bg-yellow-500/10 px-1.5 py-0.5 rounded">
-                                                                                <Star size={10} fill="currentColor" />
-                                                                                {episode.vote_average.toFixed(1)}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <p className="text-gray-400 text-sm mt-1 line-clamp-2">{episode.overview || "No description available."}</p>
-                                                                    <div className="flex items-center gap-3 mt-2 text-xs text-gray-500">
-                                                                        <span className="flex items-center gap-1"><Calendar size={12} /> {episode.air_date}</span>
-                                                                        {episode.runtime && <span className="flex items-center gap-1"><Clock size={12} /> {episode.runtime}m</span>}
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        ))
-                                                    ) : (
-                                                        <div className="text-center text-gray-500 py-4">No episodes found.</div>
-                                                    )}
-                                                </div>
-                                            )}
+                                            </div>
+                                            <div className="p-3">
+                                                <h4 className="text-white font-bold text-sm truncate">{season.name}</h4>
+                                                <p className="text-gray-500 text-xs">{season.air_date?.split('-')[0]}</p>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
-                            </div>
+                            </section>
                         )}
 
                         {/* Collection / Franchise */}
