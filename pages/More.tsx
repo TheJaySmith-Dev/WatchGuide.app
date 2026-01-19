@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getTrendingPeople, getImageUrl } from '../services/api';
+import { getTrendingPeople, getImageUrl, getGenres } from '../services/api';
 import { Person, TraktUser } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database, Film, Tv, Clock, PieChart } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { traktService } from '../services/trakt';
@@ -46,9 +46,58 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     const [showReleaseNotes, setShowReleaseNotes] = useState(false);
     const [mdbAuthenticated, setMdbAuthenticated] = useState(false);
 
+    // Stats
+    const [stats, setStats] = useState({ 
+        movies: 0, 
+        shows: 0, 
+        hours: 0, 
+        topGenre: 'None' 
+    });
+
     useEffect(() => {
         getTrendingPeople().then(setPeople);
         setMdbAuthenticated(mdblistService.isAuthenticated());
+        
+        // Calculate Stats
+        const calculateStats = async () => {
+            const watched = storageService.getListSync('watched');
+            const movies = watched.filter(i => i.media_type === 'movie').length;
+            const shows = watched.filter(i => i.media_type === 'tv').length;
+            
+            // Estimate Hours (Movies ~2h, Shows ~10h avg per entry if season/show, or ~1h if episode)
+            // Local items are usually Movies or Shows (not episodes). 
+            // We'll estimate: Movie = 2h, Show = 8h (conservative season avg)
+            const estimatedHours = (movies * 2) + (shows * 8);
+
+            // Top Genre
+            const genres = await getGenres('movie'); // Get movie genres for mapping
+            const tvGenres = await getGenres('tv');
+            const allGenres = [...genres, ...tvGenres];
+            
+            const genreCounts: Record<number, number> = {};
+            watched.forEach(item => {
+                if (item.genre_ids) {
+                    item.genre_ids.forEach(id => {
+                        genreCounts[id] = (genreCounts[id] || 0) + 1;
+                    });
+                }
+            });
+
+            let topGenreName = 'None';
+            let maxCount = 0;
+            
+            Object.entries(genreCounts).forEach(([id, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    const genre = allGenres.find(g => g.id === Number(id));
+                    if (genre) topGenreName = genre.name;
+                }
+            });
+
+            setStats({ movies, shows, hours: estimatedHours, topGenre: topGenreName });
+        };
+        
+        calculateStats();
     }, []);
 
     // Notify parent when lists view is toggled
@@ -85,6 +134,46 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
             {/* Subscriptions */}
             {/* Removed per user request */}
+
+            {/* Stats Widgets */}
+            <div className="flex flex-wrap justify-center md:justify-start gap-4 mb-8">
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
+                    <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                        <Film size={20} />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-2xl font-bold text-white">{stats.movies}</span>
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Movies</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
+                    <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                        <Tv size={20} />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-2xl font-bold text-white">{stats.shows}</span>
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Shows</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
+                    <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400">
+                        <Clock size={20} />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-2xl font-bold text-white">{stats.hours}h</span>
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Time</span>
+                    </div>
+                </div>
+                <div className="flex items-center gap-3 bg-white/5 border border-white/10 rounded-xl px-5 py-3">
+                    <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
+                        <PieChart size={20} />
+                    </div>
+                    <div className="text-left">
+                        <span className="block text-xl font-bold text-white line-clamp-1 max-w-[100px]">{stats.topGenre}</span>
+                        <span className="text-xs text-gray-400 uppercase font-bold tracking-wider">Top Genre</span>
+                    </div>
+                </div>
+            </div>
 
             {/* Features Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
