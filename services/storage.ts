@@ -122,12 +122,18 @@ class StorageService {
                                 if (localIndex !== -1) {
                                     // Update local with cloud properties (viewType, thumbnail, name)
                                     // Cloud is source of truth for these settings
+                                    // CRITICAL: Ensure we don't accidentally overwrite a 'row' with a default 'hub' from an old cloud config
+                                    // Actually, cloud MUST be the source of truth, otherwise devices will fight.
+                                    // If user changes it on device A, device A pushes to cloud. Device B pulls from cloud.
+                                    // The issue is likely that "Liked Lists" sync logic runs BEFORE fetchConfig, creating a default 'hub' entry
+                                    // and then maybe we aren't merging correctly or the ID match fails?
+                                    
                                     mergedLists[localIndex] = {
                                         ...mergedLists[localIndex],
                                         viewType: cloudList.viewType,
                                         thumbnailUrl: cloudList.thumbnailUrl,
                                         customName: cloudList.customName || mergedLists[localIndex].customName,
-                                        id: cloudList.id // Sync the ID to match cloud for future updates
+                                        id: cloudList.id 
                                     };
                                 } else {
                                     // Add new list from cloud
@@ -235,7 +241,20 @@ class StorageService {
                 let hasChanges = false;
 
                 this.cache.likedLists.forEach(list => {
-                    if (!existingIds.has(list.ids.trakt) && list.name !== this.CONFIG_LIST_NAME) { // Ignore config list
+                    // Check if list already exists in customLists (by Trakt ID)
+                    const exists = this.cache.customLists.some(l => {
+                        if (l.traktList && !Array.isArray(l.traktList)) {
+                            return l.traktList.ids.trakt === list.ids.trakt;
+                        }
+                        // Handle merged lists? For now, if it's part of a merged list, we consider it "handled"
+                        // But here we are looking for exact match to avoid duplicating "My Watchlist" as a new Hub
+                        if (l.traktList && Array.isArray(l.traktList)) {
+                            return l.traktList.some(t => t.ids.trakt === list.ids.trakt);
+                        }
+                        return false;
+                    });
+
+                    if (!exists && list.name !== this.CONFIG_LIST_NAME) { // Ignore config list
                         // Add new liked list to custom lists
                         this.cache.customLists.push({
                             id: crypto.randomUUID(),
