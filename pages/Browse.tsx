@@ -91,6 +91,18 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
   }, []);
 
   useEffect(() => {
+    const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+            // Re-fetch config when app becomes visible (user might have updated it on another device)
+            storageService.fetchConfigFromTrakt().then(refreshLists);
+        }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  useEffect(() => {
     const fetchData = async () => {
       try {
         // Basic rows
