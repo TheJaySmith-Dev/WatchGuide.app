@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem, MediaDetail } from '../types';
-import { getMediaDetails, getImageUrl, getFanArtLogo } from '../services/api';
+import { MediaItem, MediaDetail, Video, Person, CollectionDetail } from '../types';
+import { getMediaDetails, getImageUrl, getPersonDetails, getFanArtLogo, getCollectionDetails } from '../services/api';
+import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight } from 'lucide-react';
 import { storageService } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
-import { X, Calendar, Star, Clock, Play, DollarSign, Users, Award, ExternalLink, Plus, Check, Heart } from 'lucide-react';
 import ContentRow from './ContentRow';
 
 interface MediaDetailViewProps {
@@ -24,12 +23,14 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     const [showSyncPrompt, setShowSyncPrompt] = useState(false);
 
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [collectionParts, setCollectionParts] = useState<MediaItem[]>([]);
 
     // When item changes, reset details and fetch new ones
     useEffect(() => {
         setLoading(true);
         setDetails(null);
         setLogoUrl(null);
+        setCollectionParts([]);
         setIsPlanToWatch(storageService.isInList('planToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
@@ -44,6 +45,19 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
             setDetails(data);
             setLogoUrl(logo);
             setLoading(false);
+            
+            // If part of a collection, fetch the full collection details to get the parts
+            if (data.belongs_to_collection) {
+                getCollectionDetails(data.belongs_to_collection.id).then(col => {
+                    if (col && col.parts) {
+                        // Sort by release date
+                        const sorted = col.parts
+                            .filter(p => p.release_date)
+                            .sort((a, b) => new Date(a.release_date!).getTime() - new Date(b.release_date!).getTime());
+                        setCollectionParts(sorted);
+                    }
+                });
+            }
         }).catch((err) => {
             console.error(err);
             setLoading(false);
@@ -335,21 +349,53 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
                         {/* Collection / Franchise */}
                         {details?.belongs_to_collection && (
-                            <div
-                                onClick={() => onCollectionClick(details.belongs_to_collection!.id)}
-                                className="relative h-48 rounded-2xl overflow-hidden group cursor-pointer border border-white/10"
-                            >
-                                <img
-                                    src={getImageUrl(details.belongs_to_collection.backdrop_path, 'original')}
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    alt={details.belongs_to_collection.name}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-transparent flex flex-col justify-center px-8">
-                                    <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">Collection</span>
-                                    <h3 className="text-3xl font-bold text-white">{details.belongs_to_collection.name}</h3>
-                                    <div className="flex items-center gap-2 mt-4 text-white font-bold text-sm">
-                                        <span>View Franchise</span>
-                                        <Play size={12} className="ml-1" />
+                            <div className="space-y-4">
+                                <div
+                                    onClick={() => onCollectionClick(details.belongs_to_collection!.id)}
+                                    className="relative h-64 md:h-80 rounded-2xl overflow-hidden group cursor-pointer border border-white/10"
+                                >
+                                    <img
+                                        src={getImageUrl(details.belongs_to_collection.backdrop_path, 'original')}
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-60"
+                                        alt={details.belongs_to_collection.name}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8">
+                                        <div className="mb-6">
+                                            <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2 block">Collection</span>
+                                            <h3 className="text-3xl font-bold text-white mb-2">{details.belongs_to_collection.name}</h3>
+                                            <div className="flex items-center gap-2 text-white/80 font-bold text-sm hover:text-white transition-colors">
+                                                <span>View Full Franchise</span>
+                                                <ChevronRight size={16} />
+                                            </div>
+                                        </div>
+
+                                        {/* Inline Collection Parts */}
+                                        {collectionParts.length > 0 && (
+                                            <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar snap-x" onClick={(e) => e.stopPropagation()}>
+                                                {collectionParts.map(part => (
+                                                    <div 
+                                                        key={part.id}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onItemClick({ ...part, media_type: 'movie' });
+                                                        }}
+                                                        className="snap-start shrink-0 w-24 md:w-28 aspect-[2/3] rounded-lg overflow-hidden border border-white/20 hover:border-indigo-500 transition-all hover:scale-105 shadow-lg relative group/part"
+                                                        title={part.title}
+                                                    >
+                                                        <img 
+                                                            src={getImageUrl(part.poster_path)} 
+                                                            className="w-full h-full object-cover" 
+                                                            alt={part.title}
+                                                        />
+                                                        {part.id === item.id && (
+                                                            <div className="absolute inset-0 bg-indigo-600/40 border-2 border-indigo-500 flex items-center justify-center">
+                                                                <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded">NOW</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
