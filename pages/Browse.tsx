@@ -365,7 +365,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
                 disableHoverAnimation={true}
                 thumbnailSize={thumbnailSize}
                 headerContent={
-                    <div className="hidden md:flex bg-white/10 rounded-lg p-1 gap-1">
+                    <div className="flex bg-white/10 rounded-lg p-1 gap-1">
                         <button onClick={() => handleSizeChange('small')} className={`p-1 rounded ${thumbnailSize === 'small' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Small">
                             <div className="w-3 h-3 bg-current rounded-sm" />
                         </button>
