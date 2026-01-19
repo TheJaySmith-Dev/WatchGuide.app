@@ -171,6 +171,8 @@ const App: React.FC = () => {
         return <Search onItemClick={(item) => {
           if (item.media_type === 'person') {
             handlePersonClick(item.id);
+          } else if (item.media_type === 'collection') {
+            handleCollectionClick(item.id);
           } else {
             handleMediaClick(item);
           }

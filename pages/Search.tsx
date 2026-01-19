@@ -230,7 +230,8 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                             {collections.slice(0, 4).map(item => (
                                 <div 
                                     key={item.id}
-                                    className="relative rounded-2xl overflow-hidden bg-gray-800 border border-white/10 group"
+                                    onClick={() => onItemClick({ ...item, media_type: 'collection' })}
+                                    className="relative rounded-2xl overflow-hidden bg-gray-800 border border-white/10 group cursor-pointer"
                                 >
                                     {/* Collection Banner */}
                                     <div className="relative h-48 md:h-64">
