@@ -58,7 +58,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
   return (
     <div className="py-2 space-y-4 group/row">
       {!hideTitle && (
-        <div className="flex items-center justify-between px-6 md:pl-40 md:pr-12">
+        <div className="flex items-center justify-between px-6 md:pl-24 md:pr-12">
           <div className="flex items-center gap-4">
             <h2 className="text-xl md:text-2xl font-semibold text-white tracking-tight">{title}</h2>
             {headerContent}
@@ -82,7 +82,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
               className += "hover:scale-105 hover:z-10 ";
           }
 
-          if (index === 0) className += "md:ml-40 ";
+          if (index === 0) className += "md:ml-24 ";
           if (index === items.length - 1) className += "md:mr-12 ";
 
           return (

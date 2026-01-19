@@ -34,6 +34,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
   // Step 2 config
   const [customName, setCustomName] = useState('');
   const [thumbnailUrl, setThumbnailUrl] = useState('');
+  const [viewType, setViewType] = useState<'row' | 'hub'>('hub');
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,6 +88,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
     const config: any = {
       customName: customName || selectedList.name,
       thumbnailUrl: thumbnailUrl || undefined,
+      viewType: viewType,
     };
     
     if (isTrakt) {
@@ -208,25 +210,58 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
               </div>
 
               <div>
-                <label className="block text-gray-400 text-sm font-bold mb-2">Thumbnail URL (Optional)</label>
-                <div className="flex gap-2">
-                    <div className="relative flex-1">
-                        <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
-                        <input
-                        type="text"
-                        value={thumbnailUrl}
-                        onChange={(e) => setThumbnailUrl(e.target.value)}
-                        placeholder="https://example.com/image.jpg"
-                        className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-indigo-500"
-                        />
-                    </div>
+                <label className="block text-gray-400 text-sm font-bold mb-2">Display Type</label>
+                <div className="flex gap-4">
+                    <button
+                        onClick={() => setViewType('hub')}
+                        className={`flex-1 p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${viewType === 'hub' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                    >
+                        <div className="w-full aspect-video bg-white/10 rounded-lg mb-1 flex items-center justify-center">
+                            <Database size={24} />
+                        </div>
+                        <span className="font-bold">Hub Card</span>
+                        <span className="text-xs text-center opacity-70">Appears as a clickable card on Home</span>
+                    </button>
+                    <button
+                        onClick={() => setViewType('row')}
+                        className={`flex-1 p-4 rounded-xl border transition-all flex flex-col items-center gap-2 ${viewType === 'row' ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                    >
+                         <div className="w-full aspect-video bg-white/10 rounded-lg mb-1 flex flex-col justify-center gap-1 px-2">
+                            <div className="w-full h-1 bg-white/30 rounded-full" />
+                            <div className="flex gap-1">
+                                <div className="w-4 h-6 bg-white/30 rounded-sm" />
+                                <div className="w-4 h-6 bg-white/30 rounded-sm" />
+                                <div className="w-4 h-6 bg-white/30 rounded-sm" />
+                            </div>
+                        </div>
+                        <span className="font-bold">Content Row</span>
+                        <span className="text-xs text-center opacity-70">Appears as a scrolling row on Home</span>
+                    </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">
-                    Leave blank to use the poster of the first item in the list.
-                </p>
               </div>
 
-              {thumbnailUrl && (
+              {viewType === 'hub' && (
+                  <div>
+                    <label className="block text-gray-400 text-sm font-bold mb-2">Thumbnail URL (Optional)</label>
+                    <div className="flex gap-2">
+                        <div className="relative flex-1">
+                            <ImageIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
+                            <input
+                            type="text"
+                            value={thumbnailUrl}
+                            onChange={(e) => setThumbnailUrl(e.target.value)}
+                            placeholder="https://example.com/image.jpg"
+                            className="w-full bg-white/5 border border-white/10 rounded-xl py-3 pl-12 pr-4 text-white focus:outline-none focus:border-indigo-500"
+                            />
+                        </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                        Leave blank to use the poster of the first item in the list.
+                    </p>
+                  </div>
+              )}
+
+              {viewType === 'hub' && thumbnailUrl && (
                   <div className="w-full h-32 rounded-xl overflow-hidden border border-white/10 bg-black/50 flex items-center justify-center relative">
                       <img 
                         src={thumbnailUrl} 

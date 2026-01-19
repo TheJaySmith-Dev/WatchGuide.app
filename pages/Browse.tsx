@@ -26,6 +26,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
   const [loading, setLoading] = useState(true);
   const [aiLoading, setAiLoading] = useState(false);
   const [error, setError] = useState(false);
+  const [rowListItems, setRowListItems] = useState<Record<string, MediaItem[]>>({});
 
   const [thumbnailSize, setThumbnailSize] = useState<'small' | 'medium' | 'large'>(storageService.getThumbnailSize());
 
@@ -67,6 +68,28 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
       if (onListClose) onListClose();
   };
 
+  const [isGeneratingAI, setIsGeneratingAI] = useState(false);
+
+  const refreshLists = () => {
+      const lists = storageService.getCustomLists();
+      setCustomLists([...lists]); // Force refresh
+      
+      // Load items for lists marked as 'row'
+      lists.forEach(async (list) => {
+          if (list.viewType === 'row') {
+              const items = await storageService.getListItems(list);
+              setRowListItems(prev => ({
+                  ...prev,
+                  [list.id]: items
+              }));
+          }
+      });
+  };
+
+  useEffect(() => {
+    refreshLists();
+  }, []);
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -83,18 +106,32 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
         setPopularShows(popShows);
         setTopRatedMovies(topRated);
 
-        // Load cached AI recommendations
-        const cached = storageService.getAIRecommendations();
-        if (cached) {
-          setAiRecommendations(cached.items);
-        }
-
-        // Personalized rows
+        // Check for AI updates
         const likedItems = await storageService.getList('liked');
         const watchedItems = await storageService.getList('watched');
         
+        const liked = likedItems.map(i => i.title || i.name).sort().join('|');
+        const watched = watchedItems.map(i => i.title || i.name).sort().join('|');
+        const currentHash = `${liked}::${watched}`;
+
+        const cached = storageService.getAIRecommendations();
+        
+        if (cached && cached.items.length > 0) {
+            setAiRecommendations(cached.items);
+            
+            // If hash doesn't match and we have enough items, refresh silently
+            if (cached.sourceHash !== currentHash && (likedItems.length + watchedItems.length) >= 3) {
+                 handleLoadAIRecommendations(true); // Silent refresh
+            }
+        } else if ((likedItems.length + watchedItems.length) >= 3) {
+             // First load if eligible
+             handleLoadAIRecommendations(true);
+        }
+
+        // Personalized rows
+        
         // Load custom lists
-        setCustomLists(storageService.getCustomLists());
+        refreshLists();
 
         const referenceItem = likedItems[likedItems.length - 1] || watchedItems[watchedItems.length - 1];
 
@@ -119,30 +156,33 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
     fetchData();
   }, []);
 
-  const refreshLists = () => {
-      setCustomLists(storageService.getCustomLists());
-  };
-
-  const handleLoadAIRecommendations = async () => {
-    setAiLoading(true);
+  const handleLoadAIRecommendations = async (silent = false) => {
+    if (!silent) setAiLoading(true);
+    setIsGeneratingAI(true);
     try {
       const likedItems = storageService.getListSync('liked');
       const watchedItems = storageService.getListSync('watched');
+      
+      // Calculate hash for current state
+      const liked = likedItems.map(i => i.title || i.name).sort().join('|');
+      const watched = watchedItems.map(i => i.title || i.name).sort().join('|');
+      const currentHash = `${liked}::${watched}`;
 
       if (likedItems.length === 0 && watchedItems.length === 0) {
-        alert("Add some movies to your Liked or Watched lists first so the AI knows what you enjoy!");
+        if (!silent) alert("Add some movies to your Liked or Watched lists first so the AI knows what you enjoy!");
         setAiLoading(false);
+        setIsGeneratingAI(false);
         return;
       }
 
-      const liked = likedItems.map(i => i.title || i.name).join(', ');
-      const watched = watchedItems.map(i => i.title || i.name).join(', ');
+      const likedStr = likedItems.map(i => i.title || i.name).join(', ');
+      const watchedStr = watchedItems.map(i => i.title || i.name).join(', ');
 
       const prompt = `Act as a movie discovery expert. I want 10 personalized recommendations (movies/TV) based on my tastes.
         
         MY LIBRARY:
-        - Liked: ${liked}
-        - Watched: ${watched}
+        - Liked: ${likedStr}
+        - Watched: ${watchedStr}
         
         REQUIREMENTS:
         - Recommend titles I HAVEN'T watched/liked yet.
@@ -182,12 +222,13 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
       }
 
       setAiRecommendations(validResults);
-      storageService.setAIRecommendations(validResults);
+      storageService.setAIRecommendations(validResults, currentHash);
     } catch (e) {
       console.error("AI Recommendation failed:", e);
-      alert("AI is having a moment. Please try again or add more likes to your profile!");
+      if (!silent) alert("AI is having a moment. Please try again or add more likes to your profile!");
     } finally {
       setAiLoading(false);
+      setIsGeneratingAI(false);
     }
   };
 
@@ -220,71 +261,90 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
   // Determine Hero Items: Use Trending, fallback to Now Playing, then Popular Shows
   const heroItems = trending.length > 0 ? trending.slice(0, 10) : (nowPlayingMovies.length > 0 ? nowPlayingMovies : popularShows);
 
-  // Convert Custom Lists to MediaItem format for ContentRow
-  const listThumbnails: MediaItem[] = customLists.map(list => {
-      // Create a stable numeric ID from the string ID for the MediaItem interface
-      let hash = 0;
-      for (let i = 0; i < list.id.length; i++) {
-          hash = (hash << 5) - hash + list.id.charCodeAt(i);
-          hash |= 0;
+  // Filter lists based on viewType
+  const hubLists = customLists.filter(l => l.viewType !== 'row');
+  const rowLists = customLists.filter(l => l.viewType === 'row');
+
+  // Transform for hub display
+  const listThumbnails = hubLists.map(list => {
+      // Logic to find best image for list thumbnail
+      let poster_path = null;
+      let backdrop_path = null;
+      
+      // If custom thumbnail is provided (and it's a hub), use it
+      if (list.thumbnailUrl) {
+          // Use the custom thumbnail as both poster and backdrop for simplicity in the row component
+          poster_path = list.thumbnailUrl;
+          backdrop_path = list.thumbnailUrl;
+      } else {
+          // Fallback to first item in list if available
+          // This would require fetching list items which might be expensive to do for all lists upfront
+          // For now, we'll use a placeholder or logic if we have cached items
       }
-      const numericId = Math.abs(hash);
 
       return {
-          id: numericId,
+          id: parseInt(list.id.replace(/-/g, '').substring(0, 8), 16), // Fake ID for types
           title: list.customName,
           name: list.customName,
-          poster_path: list.thumbnailUrl || null,
-          backdrop_path: list.thumbnailUrl || null,
-          overview: '',
-          media_type: 'person', // Use 'person' or any type to pass validation, we handle click separately
-          // Store original ID in a way we can retrieve it? 
-          // Actually we can just find the list by numericId matching in the click handler if we replicate logic,
-          // OR we can just find by title if unique, OR just trust the index if we pass index to click?
+          media_type: 'movie',
+          poster_path,
+          backdrop_path,
           // ContentRow passes the item back. We can attach the real ID as a custom property casted.
           realListId: list.id
       } as any;
   });
 
+  // Safe check for thumbnails
+  const safeListThumbnails = listThumbnails.map(t => ({
+      ...t,
+      // If the path is a data URI, keep it as is. If it's undefined/null, keep undefined.
+      // If it's a relative path, it will be handled by getImageUrl.
+      poster_path: t.poster_path || undefined, 
+      backdrop_path: t.backdrop_path || undefined
+  }));
+
   return (
     <div className="pb-24 md:pb-0">
       <HeroCarousel items={heroItems} onItemClick={onItemClick} />
 
-      <div className="-mt-16 relative z-30 space-y-8 pb-10">
+      <div className="-mt-16 md:-mt-32 relative z-30 space-y-8 pb-10">
 
         {/* AI For You Row - Only shows if 3+ items in library */}
         {(storageService.getListSync('liked').length + storageService.getListSync('watched').length) >= 3 && (
-          <div className="px-6 md:px-12">
+          <div className="px-6 md:pl-24 md:pr-12">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <Sparkles className="text-amber-400" size={20} />
                 <h2 className="text-xl md:text-2xl font-black text-white">AI Powered For You</h2>
               </div>
-              <button
-                onClick={handleLoadAIRecommendations}
-                disabled={aiLoading}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 text-sm font-bold"
-              >
-                {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                {aiRecommendations.length > 0 ? 'Refresh Picks' : 'Load For You'}
-              </button>
+              {/* Only show refresh button if we already have recommendations */}
+              {aiRecommendations.length > 0 && (
+                  <button
+                    onClick={() => handleLoadAIRecommendations(false)}
+                    disabled={aiLoading}
+                    className="hidden md:flex items-center gap-2 px-4 py-2 bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/20 rounded-xl transition-all text-indigo-400 text-sm font-bold"
+                  >
+                    {aiLoading ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                    Refresh Picks
+                  </button>
+              )}
             </div>
 
             {aiRecommendations.length > 0 ? (
               <ContentRow title="" items={aiRecommendations} onItemClick={onItemClick} isPoster={true} hideTitle={true} />
             ) : (
-              <div className="h-48 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center bg-white/5 group hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={handleLoadAIRecommendations}>
+              <div className="h-48 rounded-3xl border border-dashed border-white/10 flex flex-col items-center justify-center bg-white/5 group hover:border-indigo-500/30 transition-colors cursor-pointer" onClick={() => handleLoadAIRecommendations(false)}>
                 <p className="text-gray-500 font-medium group-hover:text-indigo-400 transition-colors">Click to generate personalized picks based on your library</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Custom Lists Row */}
-        {listThumbnails.length > 0 && (
+        {/* Custom Lists Row (Hubs) */}
+        {safeListThumbnails.length > 0 && (
             <ContentRow 
                 title="Your Lists" 
-                items={listThumbnails} 
+                items={safeListThumbnails} 
                 onItemClick={(item: any) => {
                     const list = customLists.find(l => l.id === item.realListId);
                     if (list) handleListClick(list);
@@ -293,7 +353,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
                 disableHoverAnimation={true}
                 thumbnailSize={thumbnailSize}
                 headerContent={
-                    <div className="flex bg-white/10 rounded-lg p-1 gap-1">
+                    <div className="hidden md:flex bg-white/10 rounded-lg p-1 gap-1">
                         <button onClick={() => handleSizeChange('small')} className={`p-1 rounded ${thumbnailSize === 'small' ? 'bg-indigo-600 text-white' : 'text-gray-400 hover:text-white'}`} title="Small">
                             <div className="w-3 h-3 bg-current rounded-sm" />
                         </button>
@@ -307,6 +367,19 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
                 }
             />
         )}
+        
+        {/* Render Custom Lists as Standard Rows */}
+        {rowLists.map(list => (
+            rowListItems[list.id] && rowListItems[list.id].length > 0 && (
+                <ContentRow 
+                    key={list.id}
+                    title={list.customName}
+                    items={rowListItems[list.id]}
+                    onItemClick={onItemClick}
+                    isPoster={true}
+                />
+            )
+        ))}
 
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />

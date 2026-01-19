@@ -10,16 +10,21 @@ import ListDetailModal from '../components/ListDetailModal';
 interface ListsPageProps {
   onBack: () => void;
   onPersonClick?: (id: number) => void;
+  filter?: (list: CustomListConfig) => boolean;
 }
 
-const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick }) => {
+const ListsPage: React.FC<ListsPageProps> = ({ onBack, onPersonClick, filter }) => {
   const [lists, setLists] = useState<CustomListConfig[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [viewingList, setViewingList] = useState<CustomListConfig | null>(null);
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
 
   const loadLists = () => {
-    setLists(storageService.getCustomLists());
+    let allLists = storageService.getCustomLists();
+    if (filter) {
+        allLists = allLists.filter(filter);
+    }
+    setLists(allLists);
   };
 
   useEffect(() => {

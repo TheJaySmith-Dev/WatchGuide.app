@@ -483,6 +483,83 @@ class TraktService {
         }
     }
 
+    // Create Personal List
+    async createList(name: string, description: string, privacy: 'private' | 'public' = 'private'): Promise<import('../types').TraktList | null> {
+        if (!this.accessToken) return null;
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/users/me/lists`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+                body: JSON.stringify({
+                    name,
+                    description,
+                    privacy,
+                    display_numbers: false,
+                    allow_comments: false
+                })
+            });
+
+            if (!response.ok) return null;
+            return await response.json();
+        } catch (error) {
+            console.error('Create Trakt list error:', error);
+            return null;
+        }
+    }
+
+    // Update Personal List
+    async updateList(listId: string | number, description: string): Promise<boolean> {
+        if (!this.accessToken) return false;
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/users/me/lists/${listId}`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+                body: JSON.stringify({
+                    description
+                })
+            });
+
+            return response.ok;
+        } catch (error) {
+            console.error('Update Trakt list error:', error);
+            return false;
+        }
+    }
+
+    // Get Personal Lists
+    async getPersonalLists(): Promise<import('../types').TraktList[]> {
+        if (!this.accessToken) return [];
+
+        try {
+            const response = await fetch(`${TRAKT_API_URL}/users/me/lists`, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+            });
+
+            if (!response.ok) return [];
+            return await response.json();
+        } catch (error) {
+            console.error('Get Trakt personal lists error:', error);
+            return [];
+        }
+    }
+
     // Get List Items
     async getListItems(listId: number | string): Promise<TraktListItem[]> {
         const headers: any = {

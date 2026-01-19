@@ -210,7 +210,8 @@ export interface CustomListConfig {
     traktList?: TraktList | TraktList[]; // Can be a single list or multiple merged lists
     mdblistList?: MDBListList | MDBListList[]; // MDBList integration
     customName?: string;
-    thumbnailUrl?: string;
+    viewType?: 'row' | 'hub'; // Defaults to 'hub' if undefined
+    thumbnailUrl?: string; // Optional custom thumbnail for hubs
     items?: MediaItem[]; // Cached items
     lastFetch?: number;
 }

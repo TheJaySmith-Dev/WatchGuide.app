@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { MediaItem, MediaDetail } from '../types';
-import { getMediaDetails, getImageUrl } from '../services/api';
+import { getMediaDetails, getImageUrl, getFanArtLogo } from '../services/api';
 import { storageService } from '../services/storage';
 import { copyToClipboard } from '../services/clipboard';
 import { X, Calendar, Star, Clock, Play, DollarSign, Users, Award, ExternalLink, Plus, Check, Heart } from 'lucide-react';
@@ -23,23 +23,31 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     const [isLiked, setIsLiked] = useState(storageService.isInList('liked', item.id));
     const [showSyncPrompt, setShowSyncPrompt] = useState(false);
 
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
     // When item changes, reset details and fetch new ones
     useEffect(() => {
         setLoading(true);
         setDetails(null);
+        setLogoUrl(null);
         setIsPlanToWatch(storageService.isInList('planToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
 
-        getMediaDetails(item.media_type as 'movie' | 'tv' || 'movie', item.id)
-            .then((data) => {
-                setDetails(data);
-                setLoading(false);
-            })
-            .catch((err) => {
-                console.error(err);
-                setLoading(false);
-            });
+        const type = item.media_type as 'movie' | 'tv' || 'movie';
+
+        // Parallel fetch for details and logo
+        Promise.all([
+            getMediaDetails(type, item.id),
+            getFanArtLogo(type, item.id)
+        ]).then(([data, logo]) => {
+            setDetails(data);
+            setLogoUrl(logo);
+            setLoading(false);
+        }).catch((err) => {
+            console.error(err);
+            setLoading(false);
+        });
     }, [item]);
 
     // Use loaded details or fallback to basic item info
@@ -146,9 +154,17 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
                     <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 flex flex-col md:flex-row items-end gap-8">
                         <div className="flex-1 mb-4 md:mb-0">
-                            <h1 className="text-3xl md:text-5xl font-black text-white mb-2 leading-tight drop-shadow-xl">
-                                {displayItem.title || displayItem.name}
-                            </h1>
+                            {logoUrl ? (
+                                <img 
+                                    src={logoUrl} 
+                                    alt={displayItem.title || displayItem.name} 
+                                    className="max-h-12 md:max-h-20 w-auto object-contain mb-4 drop-shadow-lg"
+                                />
+                            ) : (
+                                <h1 className="text-3xl md:text-5xl font-black text-white mb-2 leading-tight drop-shadow-xl max-w-2xl">
+                                    {displayItem.title || displayItem.name}
+                                </h1>
+                            )}
                             {details?.tagline && (
                                 <p className="text-lg md:text-xl text-indigo-300 font-medium italic mb-4 drop-shadow-md">"{details.tagline}"</p>
                             )}
@@ -186,36 +202,6 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                         </div>
 
                         <div className="flex flex-col md:flex-row items-center gap-4 mt-2">
-                            {trailer && (
-                                <a href="#trailer" className="flex items-center gap-3 bg-white text-black px-6 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-white/10">
-                                    <Play size={20} fill="currentColor" />
-                                    Watch Trailer
-                                </a>
-                            )}
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handleToggleList('planToWatch')}
-                                    title="Plan to Watch"
-                                    className={`p-4 rounded-full border transition-all ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Plus size={20} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
-                                </button>
-                                <button
-                                    onClick={() => handleToggleList('watched')}
-                                    title="Watched"
-                                    className={`p-4 rounded-full border transition-all ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Check size={20} />
-                                </button>
-                                <button
-                                    onClick={() => handleToggleList('liked')}
-                                    title="Like"
-                                    className={`p-4 rounded-full border transition-all ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
@@ -228,6 +214,31 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                         {/* Mobile Poster only */}
                         <div className="md:hidden w-32 rounded-lg overflow-hidden shadow-lg mb-6">
                             <img src={getImageUrl(displayItem.poster_path)} className="w-full h-auto" alt="Poster" />
+                        </div>
+
+                        {/* Action Buttons (Moved from Hero) */}
+                        <div className="flex items-center justify-between gap-2 bg-white/5 border border-white/10 rounded-2xl p-4 shadow-xl">
+                            <button
+                                onClick={() => handleToggleList('planToWatch')}
+                                title="Plan to Watch"
+                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                            >
+                                <Plus size={20} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
+                            </button>
+                            <button
+                                onClick={() => handleToggleList('watched')}
+                                title="Watched"
+                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                            >
+                                <Check size={20} />
+                            </button>
+                            <button
+                                onClick={() => handleToggleList('liked')}
+                                title="Like"
+                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                            >
+                                <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
+                            </button>
                         </div>
 
                         {/* Streaming Info */}

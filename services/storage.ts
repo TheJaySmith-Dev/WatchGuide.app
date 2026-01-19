@@ -28,8 +28,73 @@ class StorageService {
     private CACHE_DURATION = 0; // Disable cache for now to ensure sync
     private LIST_CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache for lists
 
+    private CONFIG_LIST_NAME = 'watchguide-config';
+    private configListId: string | number | null = null;
+
     constructor() {
         this.loadLocalCustomLists();
+    }
+
+    // Sync configuration to Trakt
+    async syncConfigToTrakt() {
+        if (!traktService.isAuthenticated()) return;
+
+        try {
+            // Find or create the config list
+            if (!this.configListId) {
+                const lists = await traktService.getPersonalLists();
+                const configList = lists.find(l => l.name === this.CONFIG_LIST_NAME);
+                
+                if (configList) {
+                    this.configListId = configList.ids.slug; // Use slug or id
+                } else {
+                    const newList = await traktService.createList(
+                        this.CONFIG_LIST_NAME, 
+                        JSON.stringify(this.cache.customLists), 
+                        'private'
+                    );
+                    if (newList) this.configListId = newList.ids.slug;
+                }
+            }
+
+            // Update list description with serialized config
+            if (this.configListId) {
+                const configStr = JSON.stringify(this.cache.customLists);
+                await traktService.updateList(this.configListId, configStr);
+                console.log('Synced config to Trakt');
+            }
+        } catch (e) {
+            console.error('Failed to sync config to Trakt', e);
+        }
+    }
+
+    // Fetch configuration from Trakt
+    async fetchConfigFromTrakt() {
+        if (!traktService.isAuthenticated()) return;
+
+        try {
+            const lists = await traktService.getPersonalLists();
+            const configList = lists.find(l => l.name === this.CONFIG_LIST_NAME);
+
+            if (configList && configList.description) {
+                this.configListId = configList.ids.slug;
+                try {
+                    const cloudConfig = JSON.parse(configList.description);
+                    
+                    // Simple merge strategy: Cloud overwrites local if different length or newer
+                    // ideally we'd have timestamps, but for now let's trust cloud if valid
+                    if (Array.isArray(cloudConfig) && cloudConfig.length > 0) {
+                        this.cache.customLists = cloudConfig;
+                        this.saveLocalCustomLists();
+                        console.log('Loaded config from Trakt', cloudConfig);
+                    }
+                } catch (parseErr) {
+                    console.error('Invalid config in Trakt list description', parseErr);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to fetch config from Trakt', e);
+        }
     }
 
     private loadLocalCustomLists() {
@@ -117,7 +182,7 @@ class StorageService {
                 let hasChanges = false;
 
                 this.cache.likedLists.forEach(list => {
-                    if (!existingIds.has(list.ids.trakt)) {
+                    if (!existingIds.has(list.ids.trakt) && list.name !== this.CONFIG_LIST_NAME) { // Ignore config list
                         // Add new liked list to custom lists
                         this.cache.customLists.push({
                             id: crypto.randomUUID(),
@@ -130,6 +195,7 @@ class StorageService {
 
                 if (hasChanges) {
                     this.saveLocalCustomLists();
+                    this.syncConfigToTrakt(); // Sync new additions
                 }
             }
 
@@ -261,6 +327,7 @@ class StorageService {
         };
         this.cache.customLists = [...this.cache.customLists, newList];
         this.saveLocalCustomLists();
+        this.syncConfigToTrakt(); // Trigger sync
         return newList;
     }
 
@@ -268,6 +335,7 @@ class StorageService {
     removeCustomList(id: string) {
         this.cache.customLists = this.cache.customLists.filter(l => l.id !== id);
         this.saveLocalCustomLists();
+        this.syncConfigToTrakt(); // Trigger sync
     }
 
     // Get Items for a specific Custom List Config (handles merged lists)
@@ -393,18 +461,20 @@ class StorageService {
         }
         
         this.saveLocalCustomLists();
+        this.syncConfigToTrakt(); // Trigger sync
     }
 
     // Get AI recommendations (kept for compatibility)
-    getAIRecommendations(): { items: MediaItem[], timestamp: number } | null {
+    getAIRecommendations(): { items: MediaItem[], timestamp: number, sourceHash: string } | null {
         const saved = localStorage.getItem('ai_recommendations');
         return saved ? JSON.parse(saved) : null;
     }
 
-    setAIRecommendations(items: MediaItem[]) {
+    setAIRecommendations(items: MediaItem[], sourceHash: string) {
         localStorage.setItem('ai_recommendations', JSON.stringify({
             items,
-            timestamp: Date.now()
+            timestamp: Date.now(),
+            sourceHash
         }));
     }
 

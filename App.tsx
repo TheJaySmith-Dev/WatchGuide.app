@@ -12,7 +12,11 @@ import OnboardingTour from './components/OnboardingTour';
 import { simklService } from './services/simkl';
 import { traktService } from './services/trakt';
 import { mdblistService } from './services/mdblist';
+import { storageService } from './services/storage';
 import { MediaItem, SimklUser, TraktUser } from './types';
+
+// Initialize storage service sync
+storageService.fetchConfigFromTrakt();
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('browse');

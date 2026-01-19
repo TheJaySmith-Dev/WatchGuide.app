@@ -241,7 +241,7 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       </div>
 
       {/* Content Layer */}
-      <div className="absolute inset-0 z-20 flex flex-col justify-end pb-32 px-6 md:pl-40 md:pr-24 md:pb-40 md:items-start text-left">
+      <div className="absolute inset-0 z-20 flex flex-col justify-end pb-32 px-6 md:pl-24 md:pr-24 md:pb-40 md:items-start text-left">
         <div className={`transition-all duration-1000 transform ${logoUrl ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-8 scale-95'
           }`}>
           {logoUrl ? (

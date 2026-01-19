@@ -54,6 +54,14 @@ const FALLBACK_DATA: MediaItem[] = [
 export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w185' | 'w1280' = 'w500') => {
   if (!path) return 'https://via.placeholder.com/500x750?text=No+Image';
   if (path.startsWith('http')) return path; // Return full URLs as is
+  if (path.startsWith('data:image')) return path; // Return data URIs as is (for user uploads)
+  
+  // Fix for 'original' being used as size when it might be expected to be a path part in some legacy calls
+  // but here we just construct the TMDB URL.
+  // NOTE: If size is 'w1280' but TMDB doesn't support it for poster (only backdrop), it might fail.
+  // Posters usually support: w92, w154, w185, w342, w500, w780, original
+  // Backdrops usually support: w300, w780, w1280, original
+  
   return `${IMAGE_BASE_URL}/${size}${path}`;
 };
 

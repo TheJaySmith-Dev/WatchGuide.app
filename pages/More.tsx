@@ -60,14 +60,17 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
 
-    if (showLists) {
-        return <ListsPage 
-            onBack={() => {
-                setShowLists(false);
-            }}
-            onPersonClick={onPersonClick} 
-        />;
-    }
+  if (showLists) {
+    return <ListsPage 
+      onBack={() => {
+        setShowLists(false);
+      }}
+      onPersonClick={onPersonClick} 
+      // Only pass lists that are NOT rows (i.e., hubs or undefined viewType)
+      filter={(list: any) => list.viewType !== 'row'}
+    />;
+  }
+
 
     if (showGuideAI) {
         return <GuideAIPage onBack={() => setShowGuideAI(false)} />;
