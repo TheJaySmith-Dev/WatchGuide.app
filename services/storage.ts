@@ -241,6 +241,7 @@ class StorageService {
                             id: crypto.randomUUID(),
                             traktList: list,
                             customName: list.name,
+                            viewType: 'hub', // Default to hub if added via like
                         });
                         hasChanges = true;
                     }
@@ -374,8 +375,12 @@ class StorageService {
 
     // Add a custom list
     addCustomList(config: Omit<CustomListConfig, 'id'>) {
+        // Ensure we respect the passed viewType, or default to hub
+        const viewType = config.viewType || 'hub';
+        
         const newList: CustomListConfig = {
             ...config,
+            viewType, // Explicitly set it
             id: crypto.randomUUID(),
         };
         this.cache.customLists = [...this.cache.customLists, newList];
