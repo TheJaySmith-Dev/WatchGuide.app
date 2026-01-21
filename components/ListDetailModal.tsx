@@ -16,6 +16,7 @@ const ListDetailModal: React.FC<ListDetailModalProps> = ({ list, onClose, onItem
   const [items, setItems] = useState<MediaItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [showMergeModal, setShowMergeModal] = useState(false);
+  const [itemsSyncUrl, setItemsSyncUrl] = useState<string>('');
 
   useEffect(() => {
     const fetchItems = async () => {
@@ -31,6 +32,7 @@ const ListDetailModal: React.FC<ListDetailModalProps> = ({ list, onClose, onItem
     };
 
     fetchItems();
+    setItemsSyncUrl(storageService.getCustomListItemsSyncUrl(list.id) || '');
   }, [list]);
 
   return (
@@ -75,6 +77,79 @@ const ListDetailModal: React.FC<ListDetailModalProps> = ({ list, onClose, onItem
         </div>
         
         <div className="flex-1 overflow-y-auto p-6 md:p-10">
+            <div className="mb-6 bg-white/5 border border-white/10 rounded-2xl p-4">
+                <h3 className="text-white font-bold mb-2">Sync Items via JSON URL</h3>
+                <div className="flex flex-col md:flex-row md:items-center md:gap-3">
+                    <div className="flex-1">
+                        <p className="text-xs text-gray-400 mb-2">Current URL</p>
+                        <div className="px-3 py-2 rounded-xl bg-white/10 text-gray-200 break-all">{itemsSyncUrl || 'Not set'}</div>
+                    </div>
+                    <div className="flex gap-2 mt-3 md:mt-0">
+                        <button
+                            onClick={async () => {
+                                const url = await storageService.getCustomListItemsDataUrl(list.id);
+                                if (!url) return;
+                                try {
+                                    await navigator.clipboard.writeText(url);
+                                } catch {
+                                    window.open(url, '_blank');
+                                }
+                            }}
+                            className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+                        >
+                            Copy Items URL
+                        </button>
+                        <button
+                            onClick={async () => {
+                                const changed = await storageService.syncCustomListItemsFromUrl(list.id);
+                                if (changed) {
+                                    const data = await storageService.getListItems(list, true);
+                                    setItems(data);
+                                }
+                            }}
+                            className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/20"
+                        >
+                            Sync Now
+                        </button>
+                    </div>
+                </div>
+                <div className="mt-3 flex gap-2">
+                    <input
+                        type="text"
+                        placeholder="Paste items JSON URL here"
+                        value={itemsSyncUrl}
+                        onChange={(e) => setItemsSyncUrl(e.target.value)}
+                        className="w-full bg-white/5 border border-white/10 rounded-xl py-2 px-3 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500"
+                    />
+                    <button
+                        onClick={() => {
+                            const url = itemsSyncUrl.trim() || null;
+                            storageService.setCustomListItemsSyncUrl(list.id, url);
+                        }}
+                        className="px-3 py-2 rounded-lg bg-white/10 text-white hover:bg-white/20 transition-colors border border-white/20"
+                    >
+                        Save
+                    </button>
+                    <button
+                        onClick={async () => {
+                            if (!itemsSyncUrl.trim()) return;
+                            const ok = await storageService.importCustomListItemsFromUrl(list.id, itemsSyncUrl.trim());
+                            if (ok) {
+                                const data = await storageService.getListItems(list, true);
+                                setItems(data);
+                                alert('Items imported');
+                            } else {
+                                alert('Failed to import items');
+                            }
+                        }}
+                        className="px-3 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-500 transition-colors"
+                    >
+                        Import
+                    </button>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">Use “Copy Items URL” on the device you want to share from, paste here, and save. You can import once or click Sync Now anytime.</p>
+            </div>
+
             {loading ? (
                 <div className="flex justify-center items-center h-64">
                     <Loader2 className="animate-spin text-indigo-500" size={48} />

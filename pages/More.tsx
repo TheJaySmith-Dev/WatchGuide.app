@@ -130,7 +130,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     }
 
     return (
-        <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
+        <div className="min-h-screen pt-24 px-6 pb-24 md:pl-32 md:pt-24 bg-[#050505]">
 
             {/* Subscriptions */}
             {/* Removed per user request */}

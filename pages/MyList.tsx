@@ -4,6 +4,7 @@ import { getImageUrl } from '../services/api';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { traktService } from '../services/trakt';
+import { mdblistService } from '../services/mdblist';
 import { Trash2, Film, Tv, Heart, ChevronRight } from 'lucide-react';
 
 interface MyListProps {
@@ -22,33 +23,31 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
     const [simklUser, setSimklUser] = useState<any>(null);
     const [traktUser, setTraktUser] = useState<any>(null);
 
-    const isAuthenticated = simklService.isAuthenticated() || traktService.isAuthenticated();
+    const isAuthenticated = simklService.isAuthenticated() || traktService.isAuthenticated() || mdblistService.isAuthenticated();
 
     useEffect(() => {
         const loadLists = async () => {
             console.log('Loading lists...', { simkl: simklService.isAuthenticated(), trakt: traktService.isAuthenticated() });
             setLoading(true);
             
-            if (isAuthenticated) {
-                // Load user info for profile link
-                if (simklService.isAuthenticated()) {
-                    const user = await simklService.getCurrentUser();
-                    setSimklUser(user);
-                }
-                if (traktService.isAuthenticated()) {
-                    const user = await traktService.getCurrentUser();
-                    setTraktUser(user);
-                }
-                
-                await storageService.refresh();
-                const newLists = {
-                    planToWatch: storageService.getListSync('planToWatch'),
-                    watched: storageService.getListSync('watched'),
-                    liked: storageService.getListSync('liked')
-                };
-                console.log('Lists loaded:', newLists);
-                setLists(newLists);
+            // Load user info for profile link
+            if (simklService.isAuthenticated()) {
+                const user = await simklService.getCurrentUser();
+                setSimklUser(user);
             }
+            if (traktService.isAuthenticated()) {
+                const user = await traktService.getCurrentUser();
+                setTraktUser(user);
+            }
+            
+            await storageService.refresh();
+            const newLists = {
+                planToWatch: storageService.getListSync('planToWatch'),
+                watched: storageService.getListSync('watched'),
+                liked: storageService.getListSync('liked')
+            };
+            console.log('Lists loaded:', newLists);
+            setLists(newLists);
             setLoading(false);
         };
         loadLists();
@@ -58,7 +57,8 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
         if (simklService.isAuthenticated() && traktService.isAuthenticated()) return 'Synced with Simkl & Trakt';
         if (simklService.isAuthenticated()) return 'Synced with Simkl';
         if (traktService.isAuthenticated()) return 'Synced with Trakt';
-        return 'Please log in to Simkl or Trakt to view your lists';
+        if (mdblistService.isAuthenticated()) return 'Synced with MDBList';
+        return 'Using local lists';
     };
 
     const handleRemove = async (item: MediaItem) => {
@@ -152,7 +152,7 @@ const MyList: React.FC<MyListProps> = ({ onItemClick }) => {
                                 className="w-full aspect-[2/3] object-cover"
                             />
                             <button
-                                onClick={() => handleRemove(item)}
+                                onClick={(e) => { e.stopPropagation(); handleRemove(item); }}
                                 className="absolute top-2 right-2 p-2 bg-rose-600/90 hover:bg-rose-600 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity"
                             >
                                 <Trash2 size={16} className="text-white" />

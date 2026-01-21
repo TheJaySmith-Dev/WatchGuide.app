@@ -240,6 +240,7 @@ export interface CustomListConfig {
     mdblistList?: MDBListList | MDBListList[]; // MDBList integration
     customName?: string;
     viewType?: 'row' | 'hub'; // Defaults to 'hub' if undefined
+    showOnBrowse?: boolean; // Controls visibility on Browse page hubs/rows
     thumbnailUrl?: string; // Optional custom thumbnail for hubs
     items?: MediaItem[]; // Cached items
     lastFetch?: number;

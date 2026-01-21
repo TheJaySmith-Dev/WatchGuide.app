@@ -11,11 +11,12 @@ interface AddListModalProps {
   mode?: 'create' | 'merge' | 'edit';
   targetListId?: string;
   existingConfig?: CustomListConfig;
+  initialProvider?: 'trakt' | 'mdblist' | 'create';
 }
 
-const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'create', targetListId, existingConfig }) => {
+const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'create', targetListId, existingConfig, initialProvider }) => {
   const [step, setStep] = useState<1 | 2>(existingConfig ? 2 : 1);
-  const [provider, setProvider] = useState<'trakt' | 'mdblist'>('trakt');
+  const [provider, setProvider] = useState<'trakt' | 'mdblist' | 'create'>(initialProvider || 'trakt');
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<(TraktList | MDBListList)[]>([]);
   const [searching, setSearching] = useState(false);
@@ -32,12 +33,17 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
             .catch(console.error)
             .finally(() => setSearching(false));
     }
+    if (provider === 'create') {
+        setSelectedList(null);
+        setStep(2);
+    }
   }, [provider]);
   
   // Step 2 config
   const [customName, setCustomName] = useState(existingConfig?.customName || '');
   const [thumbnailUrl, setThumbnailUrl] = useState(existingConfig?.thumbnailUrl || '');
   const [viewType, setViewType] = useState<'row' | 'hub'>(existingConfig?.viewType || 'hub');
+  const [showOnBrowse, setShowOnBrowse] = useState(existingConfig?.showOnBrowse !== false);
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -83,7 +89,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
   };
 
   const handleSave = async () => {
-    if (!selectedList && mode !== 'edit') return;
+    if (!selectedList && mode !== 'edit' && provider !== 'create') return;
     
     // For edit mode, we might not have changed the list itself, so reuse existing
     const finalSelectedList = selectedList;
@@ -93,21 +99,24 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
         return;
     }
     
-    if (!finalSelectedList) return;
+    if (!finalSelectedList && provider !== 'create') return;
 
-    const isTrakt = 'ids' in finalSelectedList;
+    const isTrakt = finalSelectedList ? ('ids' in finalSelectedList) : false;
 
     // Save locally
     const config: any = {
-      customName: customName || finalSelectedList.name,
+      customName: customName || (finalSelectedList ? finalSelectedList.name : ''),
       thumbnailUrl: thumbnailUrl || undefined,
       viewType: viewType,
+      showOnBrowse: showOnBrowse
     };
     
-    if (isTrakt) {
-        config.traktList = finalSelectedList;
-    } else {
-        config.mdblistList = finalSelectedList;
+    if (provider !== 'create' && finalSelectedList) {
+        if (isTrakt) {
+            config.traktList = finalSelectedList;
+        } else {
+            config.mdblistList = finalSelectedList;
+        }
     }
     
     if (mode === 'edit' && existingConfig) {
@@ -117,7 +126,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
     }
 
     // Sync: Like the list on Trakt so it appears on other devices (Trakt only for now)
-    if (isTrakt && mode === 'create') {
+    if (isTrakt && mode === 'create' && provider !== 'create') {
         try {
             await storageService.toggleListLike(finalSelectedList as TraktList);
         } catch (e) {
@@ -142,7 +151,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
           <h2 className="text-xl font-bold text-white">
             {step === 1 
                 ? (mode === 'merge' ? 'Merge with List' : 'Find a List') 
-                : 'Customize List'}
+                : (provider === 'create' ? 'Create List' : 'Customize List')}
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors">
             <X size={24} />
@@ -170,8 +179,16 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
                       <img src="https://mdblist.com/static/mdblist_logo.png" alt="MDBList" className="w-5 h-5 rounded-full" />
                       MDBList
                   </button>
+                  <button
+                    onClick={() => setProvider('create')}
+                    className={`flex-1 py-2 rounded-lg text-sm font-medium transition-all flex items-center justify-center gap-2 ${provider === 'create' ? 'bg-green-600 text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}
+                  >
+                      <Plus className="w-5 h-5" />
+                      Create
+                  </button>
               </div>
             
+              {provider !== 'create' && (
               <form onSubmit={handleSearch} className="relative">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={20} />
                 <input
@@ -183,8 +200,9 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
                   autoFocus
                 />
               </form>
+              )}
 
-              {searching ? (
+              {provider !== 'create' && (searching ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="animate-spin text-indigo-500" size={32} />
                 </div>
@@ -212,7 +230,7 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
                     <p className="text-center text-gray-500 py-4">No lists found.</p>
                   )}
                 </div>
-              )}
+              ))}
             </div>
           ) : (
             <div className="space-y-6">
@@ -254,6 +272,26 @@ const AddListModal: React.FC<AddListModalProps> = ({ onClose, onAdded, mode = 'c
                         <span className="font-bold">Content Row</span>
                         <span className="text-xs text-center opacity-70">Appears as a scrolling row on Home</span>
                     </button>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-gray-400 text-sm font-bold mb-2">Add to Browse Page</label>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowOnBrowse(true)}
+                    className={`flex-1 p-4 rounded-xl border transition-all flex items-center justify-center gap-2 ${showOnBrowse ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                  >
+                    <Database size={24} />
+                    <span className="font-bold">Show on Browse</span>
+                  </button>
+                  <button
+                    onClick={() => setShowOnBrowse(false)}
+                    className={`flex-1 p-4 rounded-xl border transition-all flex items-center justify-center gap-2 ${!showOnBrowse ? 'bg-indigo-600/20 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-gray-400 hover:bg-white/10'}`}
+                  >
+                    <Database size={24} />
+                    <span className="font-bold">Hide from Browse</span>
+                  </button>
                 </div>
               </div>
 

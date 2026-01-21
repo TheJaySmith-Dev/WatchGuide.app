@@ -93,8 +93,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
   useEffect(() => {
     const handleVisibilityChange = () => {
         if (document.visibilityState === 'visible') {
-            // Re-fetch config when app becomes visible (user might have updated it on another device)
-            storageService.fetchConfigFromTrakt().then(refreshLists);
+            storageService.fetchLists(true).then(refreshLists);
         }
     };
 
@@ -273,9 +272,9 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
   // Determine Hero Items: Use Trending, fallback to Now Playing, then Popular Shows
   const heroItems = trending.length > 0 ? trending.slice(0, 10) : (nowPlayingMovies.length > 0 ? nowPlayingMovies : popularShows);
 
-  // Filter lists based on viewType
-  const hubLists = customLists.filter(l => l.viewType !== 'row');
-  const rowLists = customLists.filter(l => l.viewType === 'row');
+  // Filter lists based on viewType and showOnBrowse flag
+  const hubLists = customLists.filter(l => l.viewType !== 'row' && l.showOnBrowse !== false);
+  const rowLists = customLists.filter(l => l.viewType === 'row' && l.showOnBrowse !== false);
 
   // Transform for hub display
   const listThumbnails = hubLists.map(list => {
@@ -396,6 +395,9 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
         {similarItems && (
           <ContentRow title={similarItems.title} items={similarItems.items} onItemClick={onItemClick} isPoster={true} />
         )}
+
+        <ContentRow title="Trending Now" items={trending.slice(0, 10)} onItemClick={onItemClick} isPoster={true} />
+        <ContentRow title="Streaming — Trending Movies" items={trending} onItemClick={onItemClick} isPoster={true} />
 
         <ContentRow title="New Movies" items={nowPlayingMovies} onItemClick={onItemClick} isPoster={true} />
 

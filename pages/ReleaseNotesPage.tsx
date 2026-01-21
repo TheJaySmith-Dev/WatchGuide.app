@@ -15,6 +15,37 @@ interface Release {
 
 const releases: Release[] = [
     {
+        version: "1.2.0",
+        date: "January 20, 2026",
+        title: "The Discovery & Profile Update",
+        features: [
+            {
+                title: "User Profile & Stats",
+                description: "Track your journey with a new dashboard showing your total watch time and top genres. Manage your settings and API connections in one place.",
+                icon: Layout, // Reusing Layout or finding a better one like User
+                color: "text-emerald-400 bg-emerald-500/10"
+            },
+            {
+                title: "Advanced Search",
+                description: "Find exactly what you're looking for with new Genre and Year filters. Explore curated Featured Collections like Marvel and Star Wars.",
+                icon: Sparkles,
+                color: "text-cyan-400 bg-cyan-500/10"
+            },
+            {
+                title: "TV Seasons & Episodes",
+                description: "Dive deeper into TV shows with a complete season and episode guide directly in the detail view.",
+                icon: Layout, // Using Layout as placeholder, maybe change to something else if available
+                color: "text-orange-400 bg-orange-500/10"
+            },
+            {
+                title: "Trending Ranks",
+                description: "See what's hot with the new Top 10 Trending row, featuring stylized ranking numbers to highlight the most popular content.",
+                icon: Rocket,
+                color: "text-rose-400 bg-rose-500/10"
+            }
+        ]
+    },
+    {
         version: "1.1.0",
         date: "January 2026",
         title: "The Experience Update",

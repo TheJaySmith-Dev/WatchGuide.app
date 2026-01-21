@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Search, Menu, Bookmark, Calendar } from 'lucide-react';
+import { Home, Search, Menu } from 'lucide-react';
 
 interface TabBarProps {
   activeTab: string;
@@ -10,100 +10,52 @@ interface TabBarProps {
 const TabBar: React.FC<TabBarProps> = ({ activeTab, onTabChange, hideOnDesktop = false }) => {
   const tabs = [
     { id: 'browse', label: 'Browse', icon: Home },
-    { id: 'mylist', label: 'My List', icon: Bookmark },
     { id: 'search', label: 'Search', icon: Search },
     { id: 'more', label: 'More', icon: Menu },
   ];
 
   return (
     <>
-      {/* Mobile Floating Liquid Glass Bar */}
-      <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[85%] max-w-sm h-16 z-[100] rounded-full flex items-center justify-between px-8 
-        bg-white/[0.08] backdrop-blur-md 
-        border border-white/20 
-        shadow-[0_8px_32px_0_rgba(0,0,0,0.5)] 
-        shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),inset_0_-1px_0_0_rgba(255,255,255,0.1)]"
-      >
+      {/* Top Segmented Pills - Mobile */}
+      <div className="md:hidden fixed top-6 left-1/2 -translate-x-1/2 z-[210] flex items-center gap-2 px-2">
         {tabs.map((tab) => {
-          const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
               onClick={() => onTabChange(tab.id)}
-              className={`relative flex flex-col items-center justify-center w-10 h-10 transition-all duration-300 group`}
+              className={`px-4 py-2 rounded-full border transition-all duration-200 backdrop-blur-md ${
+                isActive
+                  ? 'bg-white text-black border-white/60 shadow-[0_8px_24px_rgba(255,255,255,0.2)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)]'
+                  : 'bg-white/10 text-white/80 border-white/20 shadow-[0_6px_16px_rgba(0,0,0,0.35)] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+              }`}
             >
-              {isActive && (
-                <div className="absolute inset-0 bg-indigo-400/20 blur-xl rounded-full" />
-              )}
-              <Icon
-                size={24}
-                strokeWidth={isActive ? 2.5 : 2}
-                className={`relative z-10 transition-all duration-300 ${isActive
-                  ? 'text-white scale-110 drop-shadow-[0_0_8px_rgba(255,255,255,0.5)]'
-                  : 'text-white/60 group-hover:text-white/90'
-                  }`}
-              />
+              {tab.label}
             </button>
           );
         })}
       </div>
 
-      {/* Desktop Bottom Bar - Floating Liquid Capsule (Moved from side) */}
-      <div className={`hidden md:flex fixed bottom-8 left-1/2 -translate-x-1/2 flex-row items-center px-10 py-4 z-50 rounded-full
-        bg-white/[0.06] backdrop-blur-sm 
-        border border-white/20 
-        shadow-[0_15px_40px_0_rgba(0,0,0,0.4)] 
-        shadow-[inset_0_1px_0_0_rgba(255,255,255,0.2),inset_0_-1px_0_0_rgba(255,255,255,0.1)]
-        gap-12 transition-all duration-500 ease-in-out
-        ${hideOnDesktop ? 'translate-y-[150%] hover:translate-y-0 opacity-0 hover:opacity-100' : 'translate-y-0 opacity-100'}`}
-      >
-        {/* Logo */}
-        <div className="w-10 h-10 rounded-xl overflow-hidden shadow-[0_0_20px_rgba(255,255,255,0.1)] hover:scale-105 transition-transform cursor-pointer opacity-90 hover:opacity-100 ring-1 ring-white/10 shrink-0">
-          <img
-            src="https://i.postimg.cc/dtpYyq9Z/Icon-i-OS-Dark-1024x1024-1x-2-2.png"
-            alt="Watch Guide"
-            className="w-full h-full object-cover"
-          />
-        </div>
-
-        {/* Navigation Items */}
-        <div className="flex flex-row items-center gap-8">
-          {tabs.map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => onTabChange(tab.id)}
-                className={`group relative flex items-center justify-center w-12 h-12 rounded-2xl transition-all duration-500`}
-              >
-                {/* Active State Glow background */}
-                {isActive && (
-                  <div className="absolute inset-0 bg-white/[0.1] rounded-2xl shadow-[inset_0_0_15px_rgba(255,255,255,0.1)] border border-white/10" />
-                )}
-
-                {/* Icon */}
-                <Icon
-                  size={24}
-                  strokeWidth={isActive ? 2.5 : 2}
-                  className={`relative z-10 transition-all duration-300 ${isActive
-                    ? 'text-white drop-shadow-[0_0_8px_rgba(255,255,255,0.6)]'
-                    : 'text-white/50 group-hover:text-white group-hover:scale-110'
-                    }`}
-                />
-
-                {/* Tooltip */}
-                <div className="absolute -top-12 px-3 py-1.5 bg-black/40 backdrop-blur-md border border-white/10 rounded-lg text-xs font-medium text-white opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-xl transform translate-y-2 group-hover:translate-y-0 duration-300">
-                  {tab.label}
-                </div>
-
-                {/* Active Indicator Line (Horizontal) */}
-                {isActive && <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-6 h-1 bg-indigo-400 rounded-t-full shadow-[0_0_15px_rgba(129,140,248,0.6)]" />}
-              </button>
-            );
-          })}
-        </div>
+      {/* Top Segmented Pills - Desktop */}
+      <div className={`hidden md:flex fixed top-8 left-1/2 -translate-x-1/2 z-[210] gap-3 transition-all duration-300 ${
+        hideOnDesktop ? 'opacity-0 -translate-y-6 pointer-events-none' : 'opacity-100 translate-y-0'
+      }`}>
+        {tabs.map((tab) => {
+          const isActive = activeTab === tab.id;
+          return (
+            <button
+              key={tab.id}
+              onClick={() => onTabChange(tab.id)}
+              className={`px-5 py-2.5 rounded-full border text-sm transition-all duration-200 backdrop-blur-md ${
+                isActive
+                  ? 'bg-white text-black border-white/60 shadow-[0_10px_28px_rgba(255,255,255,0.25)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)]'
+                  : 'bg-white/10 text-white/80 border-white/15 shadow-[0_8px_22px_rgba(0,0,0,0.35)] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
       </div>
     </>
   );

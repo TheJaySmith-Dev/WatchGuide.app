@@ -98,6 +98,7 @@ const App: React.FC = () => {
             
             if (success) {
                 alert('Successfully connected to MDBList!');
+                storageService.fetchLists(true);
             } else {
                 alert('Failed to connect to MDBList.');
             }

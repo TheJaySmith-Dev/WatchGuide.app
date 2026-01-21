@@ -25,14 +25,34 @@ class StorageService {
             listItems: {}
         };
 
+    private localOverlays: {
+        planToWatch: MediaItem[];
+        watched: MediaItem[];
+        liked: MediaItem[];
+    } = {
+        planToWatch: [],
+        watched: [],
+        liked: []
+    };
+
     private CACHE_DURATION = 0; // Disable cache for now to ensure sync
     private LIST_CACHE_DURATION = 1000 * 60 * 60; // 1 hour cache for lists
 
     private CONFIG_LIST_NAME = 'watchguide-config';
     private configListId: string | number | null = null;
+    private customListsSyncUrl: string | null = null;
+    private customListItemsSyncUrls: Record<string, string> = {};
 
     constructor() {
         this.loadLocalCustomLists();
+        this.loadLocalOverlays();
+        this.customListsSyncUrl = localStorage.getItem('custom_lists_sync_url') || null;
+        try {
+            const raw = localStorage.getItem('custom_list_items_sync_urls');
+            this.customListItemsSyncUrls = raw ? JSON.parse(raw) : {};
+        } catch {
+            this.customListItemsSyncUrls = {};
+        }
     }
 
     // Sync configuration to Trakt
@@ -171,6 +191,39 @@ class StorageService {
         localStorage.setItem('custom_lists', JSON.stringify(this.cache.customLists));
     }
 
+    private getLocalCustomListItemsMap(): Record<string, MediaItem[]> {
+        try {
+            const raw = localStorage.getItem('custom_list_items');
+            if (!raw) return {};
+            return JSON.parse(raw) || {};
+        } catch {
+            return {};
+        }
+    }
+
+    private setLocalCustomListItemsMap(map: Record<string, MediaItem[]>) {
+        localStorage.setItem('custom_list_items', JSON.stringify(map));
+    }
+
+    private loadLocalOverlays() {
+        try {
+            const p = localStorage.getItem('local_planToWatch');
+            const w = localStorage.getItem('local_watched');
+            const l = localStorage.getItem('local_liked');
+            this.localOverlays.planToWatch = p ? JSON.parse(p) : [];
+            this.localOverlays.watched = w ? JSON.parse(w) : [];
+            this.localOverlays.liked = l ? JSON.parse(l) : [];
+        } catch (e) {
+            console.error('Failed to load local overlays', e);
+        }
+    }
+
+    private saveLocalOverlays() {
+        localStorage.setItem('local_planToWatch', JSON.stringify(this.localOverlays.planToWatch));
+        localStorage.setItem('local_watched', JSON.stringify(this.localOverlays.watched));
+        localStorage.setItem('local_liked', JSON.stringify(this.localOverlays.liked));
+    }
+
     // Fetch lists from Simkl and Trakt
     async fetchLists(force = false): Promise<void> {
         const now = Date.now();
@@ -180,15 +233,16 @@ class StorageService {
 
         const isSimklAuth = simklService.isAuthenticated();
         const isTraktAuth = traktService.isAuthenticated();
+        const isMdbAuth = mdblistService.isAuthenticated();
 
-        if (!isSimklAuth && !isTraktAuth) {
+        if (!isSimklAuth && !isTraktAuth && !isMdbAuth) {
             this.cache = { 
-                planToWatch: [], 
-                watched: [], 
-                liked: [], 
+                planToWatch: [...this.localOverlays.planToWatch], 
+                watched: [...this.localOverlays.watched], 
+                liked: [...this.localOverlays.liked], 
                 likedLists: [], 
-                customLists: this.cache.customLists, // Preserve local custom lists
-                lastFetch: 0, 
+                customLists: this.cache.customLists, 
+                lastFetch: Date.now(), 
                 listItems: {} 
             };
             return;
@@ -210,7 +264,18 @@ class StorageService {
                 traktService.getLikedLists()
             ]) : Promise.resolve([[], [], [], []]);
 
-            const [[simklWatchlist, simklWatched, simklRated], [traktWatchlist, traktWatched, traktFavorites, traktLikedLists]] = await Promise.all([simklPromise, traktPromise]);
+            // Fetch MDBList Data
+            const mdbPromise = isMdbAuth ? Promise.all([
+                mdblistService.getLastActivities(),
+                mdblistService.getWatchlist(),
+                mdblistService.getUserLists()
+            ]) : Promise.resolve([null, [], []]);
+
+            const [simklData, traktData, mdbData] = await Promise.all([simklPromise, traktPromise, mdbPromise]);
+            const [simklWatchlist, simklWatched, simklRated] = simklData as any;
+            const [traktWatchlist, traktWatched, traktFavorites, traktLikedLists] = traktData as any;
+            const [mdbActivitiesRaw, mdbWatchlist, mdbUserLists] = mdbData as any;
+            const mdbActivities: any = mdbActivitiesRaw;
 
             // Convert items
             const simklPlanToWatch = await simklService.convertToMediaItems(simklWatchlist);
@@ -221,12 +286,135 @@ class StorageService {
             const traktWatchedItems = await traktService.convertToMediaItems(traktWatched);
             const traktLikedItems = await traktService.convertToMediaItems(traktFavorites);
 
+            // MDBList Watchlist is already MediaItems
+            const mdbPlanToWatch = mdbWatchlist as MediaItem[];
+
             // Merge Lists (Deduplicate by ID)
-            this.cache.planToWatch = this.mergeLists(simklPlanToWatch, traktPlanToWatch);
+            // Merge 3 sources for planToWatch
+            const mergedPlanToWatch = this.mergeLists(simklPlanToWatch, traktPlanToWatch);
+            this.cache.planToWatch = this.mergeLists(mergedPlanToWatch, mdbPlanToWatch);
+
             this.cache.watched = this.mergeLists(simklWatchedItems, traktWatchedItems);
             // Merge Simkl Liked (Ratings) with Trakt Favorites (and maybe Trakt Ratings if we fetched them)
             this.cache.liked = this.mergeLists(simklLikedItems, traktLikedItems);
             this.cache.likedLists = (traktLikedLists as TraktList[]) || [];
+
+            // Merge local overlays for users without Simkl/Trakt
+            this.cache.planToWatch = this.mergeLists(this.cache.planToWatch, this.localOverlays.planToWatch);
+            this.cache.watched = this.mergeLists(this.cache.watched, this.localOverlays.watched);
+            this.cache.liked = this.mergeLists(this.cache.liked, this.localOverlays.liked);
+
+            // Handle MDBList User Lists
+            if (isMdbAuth && mdbUserLists && Array.isArray(mdbUserLists)) {
+                const userLists = mdbUserLists as MDBListList[];
+                let hasMdbChanges = false;
+                const forceWatchlistRefresh = !!mdbActivities;
+                
+                // Merge specific MDBList lists into core sections if present
+                try {
+                    // Prefer a user-selected Watchlist from Custom Lists if available
+                    const preferredWatchlistId = this.getPreferredMDBWatchlistId();
+                    if (preferredWatchlistId) {
+                        const preferredItems = await this.getListItems({
+                            id: 'temp',
+                            mdblistList: userLists.find(l => l.id === preferredWatchlistId) || { id: preferredWatchlistId, name: 'Watchlist' } as any,
+                            customName: 'Watchlist',
+                            viewType: 'row'
+                        } as any, forceWatchlistRefresh);
+                        this.cache.planToWatch = this.mergeLists(this.cache.planToWatch, preferredItems);
+                    }
+                    const likedList = userLists.find(l => {
+                        const n = l.name.toLowerCase();
+                        return n.includes('liked') || n.includes('likes') || n.includes('favourites') || n.includes('favorites') || n.includes('favorite');
+                    });
+                    if (likedList) {
+                        const likedItems = await this.getListItems({
+                            id: 'temp',
+                            mdblistList: likedList,
+                            customName: likedList.name,
+                            viewType: 'row'
+                        } as any, true); // force refresh liked items
+                        this.cache.liked = this.mergeLists(this.cache.liked, likedItems);
+                    }
+                    const watchedList = userLists.find(l => {
+                        const n = l.name.toLowerCase();
+                        return n.includes('watched') || n.includes('history') || n.includes('seen');
+                    });
+                    if (watchedList) {
+                        const watchedItems = await this.getListItems({
+                            id: 'temp',
+                            mdblistList: watchedList,
+                            customName: watchedList.name,
+                            viewType: 'row'
+                        } as any);
+                        this.cache.watched = this.mergeLists(this.cache.watched, watchedItems);
+                    }
+                    const watchlistList = userLists.find(l => {
+                        const n = l.name.toLowerCase();
+                        return n.includes('watchlist') || n.includes('plan to watch') || n.includes('queue') || n.includes('to watch') || n.includes('watch later');
+                    });
+                    if (watchlistList) {
+                        const planItems = await this.getListItems({
+                            id: 'temp',
+                            mdblistList: watchlistList,
+                            customName: watchlistList.name,
+                            viewType: 'row'
+                        } as any, forceWatchlistRefresh);
+                        this.cache.planToWatch = this.mergeLists(this.cache.planToWatch, planItems);
+                    }
+                } catch (e) {
+                    console.error('Failed to merge MDBList named lists', e);
+                }
+                
+                userLists.forEach(list => {
+                    // Check if list already exists in customLists (by MDBList ID)
+                    const exists = this.cache.customLists.some(l => {
+                        if (l.mdblistList && !Array.isArray(l.mdblistList)) {
+                            return l.mdblistList.id === list.id;
+                        }
+                        if (l.mdblistList && Array.isArray(l.mdblistList)) {
+                            return l.mdblistList.some(m => m.id === list.id);
+                        }
+                        return false;
+                    });
+
+                    const n = list.name.toLowerCase();
+                    const isLikedName = n.includes('liked') || n.includes('likes') || n.includes('favourites') || n.includes('favorites') || n.includes('favorite');
+                    const isWatchedName = n.includes('watched') || n.includes('history') || n.includes('seen');
+                    const isWatchlistName = n.includes('watchlist') || n.includes('plan to watch') || n.includes('queue') || n.includes('to watch') || n.includes('watch later');
+                    const shouldBeRow = isLikedName || isWatchedName || isWatchlistName;
+
+                    if (!exists) {
+                        this.cache.customLists.push({
+                            id: crypto.randomUUID(),
+                            mdblistList: list,
+                            customName: list.name,
+                            viewType: shouldBeRow ? 'row' : 'hub',
+                            showOnBrowse: true
+                        });
+                        hasMdbChanges = true;
+                    } else {
+                        // Ensure core lists are rows, never hubs
+                        const idx = this.cache.customLists.findIndex(l => {
+                            if (l.mdblistList && !Array.isArray(l.mdblistList)) return l.mdblistList.id === list.id;
+                            if (l.mdblistList && Array.isArray(l.mdblistList)) return l.mdblistList.some(m => m.id === list.id);
+                            return false;
+                        });
+                        if (idx !== -1 && shouldBeRow && this.cache.customLists[idx].viewType !== 'row') {
+                            this.cache.customLists[idx] = {
+                                ...this.cache.customLists[idx],
+                                viewType: 'row'
+                            };
+                            hasMdbChanges = true;
+                        }
+                    }
+                });
+
+                if (hasMdbChanges) {
+                    this.saveLocalCustomLists();
+                    this.syncConfigToTrakt();
+                }
+            }
 
             // Sync Custom Lists with Trakt Liked Lists
             if (this.cache.likedLists.length > 0) {
@@ -311,19 +499,55 @@ class StorageService {
     async toggleItem(type: ListType, item: MediaItem): Promise<boolean> {
         const isSimklAuth = simklService.isAuthenticated();
         const isTraktAuth = traktService.isAuthenticated();
-
-        if (!isSimklAuth && !isTraktAuth) {
-            alert('Please log in to Simkl or Trakt to manage your lists');
-            return false;
-        }
-
+        const isMdbAuth = mdblistService.isAuthenticated();
         const list = this.cache[type];
         const index = list.findIndex(i => i.id === item.id);
         const isAdding = index === -1;
 
+        if (!isSimklAuth && !isTraktAuth && !isMdbAuth) {
+            const overlay = this.localOverlays[type];
+            const exists = overlay.some(i => i.id === item.id);
+            if (isAdding && !exists) {
+                this.localOverlays[type] = [...overlay, item];
+                this.cache[type] = [...list, item];
+            } else if (!isAdding && exists) {
+                this.localOverlays[type] = overlay.filter(i => i.id !== item.id);
+                this.cache[type] = list.filter(i => i.id !== item.id);
+            }
+            this.saveLocalOverlays();
+            return isAdding;
+        }
+
         let success = false;
 
-        // Update Simkl
+        if (isMdbAuth && type === 'planToWatch') {
+            const preferredWatchlistId = this.getPreferredMDBWatchlistId();
+            if (preferredWatchlistId) {
+                if (isAdding) {
+                    if (await mdblistService.addItemToList(preferredWatchlistId, item)) success = true;
+                } else {
+                    if (await mdblistService.removeItemFromList(preferredWatchlistId, item)) success = true;
+                }
+            } else {
+                if (isAdding) {
+                    if (await mdblistService.addToWatchlist(item)) success = true;
+                } else {
+                    if (await mdblistService.removeFromWatchlist(item)) success = true;
+                }
+            }
+        }
+        
+        if (isMdbAuth && type === 'liked') {
+            const preferredLikedId = this.getPreferredMDBLikedListId();
+            if (preferredLikedId) {
+                if (isAdding) {
+                    if (await mdblistService.addItemToList(preferredLikedId, item)) success = true;
+                } else {
+                    if (await mdblistService.removeItemFromList(preferredLikedId, item)) success = true;
+                }
+            }
+        }
+
         if (isSimklAuth) {
             if (type === 'planToWatch') {
                 if (await simklService.addToList(item, 'watchlist')) success = true;
@@ -337,7 +561,6 @@ class StorageService {
             }
         }
 
-        // Update Trakt
         if (isTraktAuth) {
              if (type === 'planToWatch') {
                 if (isAdding) {
@@ -360,17 +583,48 @@ class StorageService {
             }
         }
 
-        if (success || isAdding) { // Optimistic update if at least one succeeded
-             // Update cache
-            if (isAdding) {
-                this.cache[type] = [...list, item];
-            } else {
-                this.cache[type] = list.filter(i => i.id !== item.id);
-            }
-            return isAdding;
+        // Optimistic local update
+        if (isAdding) {
+            this.cache[type] = [...list, item];
+        } else {
+            this.cache[type] = list.filter(i => i.id !== item.id);
         }
+        const overlay = this.localOverlays[type];
+        if (isAdding) {
+            if (!overlay.some(i => i.id === item.id)) {
+                this.localOverlays[type] = [...overlay, item];
+            }
+        } else {
+            this.localOverlays[type] = overlay.filter(i => i.id !== item.id);
+        }
+        this.saveLocalOverlays();
+        return isAdding;
+    }
 
-        return !isAdding;
+    private getPreferredMDBWatchlistId(): number | null {
+        const candidates = this.cache.customLists.filter(l => {
+            const list = Array.isArray(l.mdblistList) ? null : l.mdblistList;
+            if (!list) return false;
+            const n = (list.name || '').toLowerCase();
+            return n.includes('watchlist');
+        });
+        if (candidates.length === 0) return null;
+        const first = candidates[0];
+        const list = Array.isArray(first.mdblistList) ? null : first.mdblistList;
+        return list ? list.id : null;
+    }
+
+    private getPreferredMDBLikedListId(): number | null {
+        const candidates = this.cache.customLists.filter(l => {
+            const list = Array.isArray(l.mdblistList) ? null : l.mdblistList;
+            if (!list) return false;
+            const n = (list.name || '').toLowerCase();
+            return n.includes('liked') || n.includes('likes') || n.includes('favorites') || n.includes('favourites') || n.includes('favorite') || n.includes('favs') || n.includes('fav') || n.includes('heart') || n.includes('love');
+        });
+        if (candidates.length === 0) return null;
+        const first = candidates[0];
+        const list = Array.isArray(first.mdblistList) ? null : first.mdblistList;
+        return list ? list.id : null;
     }
 
     // Check if item is in list
@@ -391,6 +645,239 @@ class StorageService {
     getCustomLists(): CustomListConfig[] {
         return this.cache.customLists || [];
     }
+    
+    addItemToLocalCustomList(listId: string, item: MediaItem) {
+        const key = `local:${listId}`;
+        const map = this.getLocalCustomListItemsMap();
+        const current = map[listId] || [];
+        if (!current.some(i => i.id === item.id)) {
+            const updated = [...current, item];
+            map[listId] = updated;
+            this.setLocalCustomListItemsMap(map);
+            this.cache.listItems[key as any] = { items: updated, timestamp: Date.now() } as any;
+        }
+    }
+
+    removeItemFromLocalCustomList(listId: string, id: number) {
+        const key = `local:${listId}`;
+        const map = this.getLocalCustomListItemsMap();
+        const current = map[listId] || [];
+        const updated = current.filter(i => i.id !== id);
+        map[listId] = updated;
+        this.setLocalCustomListItemsMap(map);
+        this.cache.listItems[key as any] = { items: updated, timestamp: Date.now() } as any;
+    }
+
+    getLocalCustomListItems(listId: string): MediaItem[] {
+        const key = `local:${listId}`;
+        const cached = this.cache.listItems[key as any];
+        if (cached) return cached.items;
+        const map = this.getLocalCustomListItemsMap();
+        const current = map[listId] || [];
+        this.cache.listItems[key as any] = { items: current, timestamp: Date.now() } as any;
+        return current;
+    }
+
+    getCustomListsSyncUrl(): string | null {
+        return this.customListsSyncUrl;
+    }
+
+    setCustomListsSyncUrl(url: string | null) {
+        this.customListsSyncUrl = url;
+        if (url) {
+            localStorage.setItem('custom_lists_sync_url', url);
+        } else {
+            localStorage.removeItem('custom_lists_sync_url');
+        }
+    }
+
+    getCustomListsDataUrl(): string {
+        const json = JSON.stringify(this.cache.customLists);
+        const base64 = this.encodeBase64(json);
+        return `data:application/json;base64,${base64}`;
+    }
+
+    getCustomListConfigDataUrl(id: string): string {
+        const list = this.cache.customLists.find(l => l.id === id);
+        if (!list) return '';
+        const json = JSON.stringify(list);
+        const base64 = this.encodeBase64(json);
+        return `data:application/json;base64,${base64}`;
+    }
+
+    async getCustomListItemsDataUrl(id: string): Promise<string> {
+        const list = this.cache.customLists.find(l => l.id === id);
+        if (!list) return '';
+        const items = await this.getListItems(list, true);
+        const json = JSON.stringify(items);
+        const base64 = this.encodeBase64(json);
+        return `data:application/json;base64,${base64}`;
+    }
+
+    async importCustomListsFromUrl(url: string): Promise<boolean> {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+            if (!Array.isArray(data)) return false;
+            // Replace local custom lists with remote definition
+            this.cache.customLists = data;
+            this.saveLocalCustomLists();
+            this.setCustomListsSyncUrl(url);
+            return true;
+        } catch (e) {
+            console.error('Failed to import custom lists from URL', e);
+            return false;
+        }
+    }
+
+    private encodeBase64(str: string): string {
+        try {
+            if (typeof btoa !== 'undefined' && typeof TextEncoder !== 'undefined') {
+                const bytes = new TextEncoder().encode(str);
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return btoa(binary);
+            }
+        } catch (e) {
+            console.error('Base64 encode failed, falling back', e);
+        }
+        try {
+            // Node.js fallback
+            // @ts-ignore
+            return Buffer.from(str, 'utf-8').toString('base64');
+        } catch {
+            // Last resort (may fail for some unicode, but try)
+            // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+            // @ts-ignore
+            return btoa(unescape(encodeURIComponent(str)));
+        }
+    }
+
+    async importCustomListConfigFromUrl(url: string): Promise<boolean> {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+            const items: CustomListConfig[] = Array.isArray(data) ? data : [data];
+            const toAdd: CustomListConfig[] = [];
+            items.forEach(cfg => {
+                if (!cfg || typeof cfg !== 'object') return;
+                const exists = this.cache.customLists.some(l => {
+                    if (l.id === cfg.id) return true;
+                    if (l.traktList && cfg.traktList && !Array.isArray(l.traktList) && !Array.isArray(cfg.traktList)) {
+                        return l.traktList.ids.trakt === cfg.traktList.ids.trakt;
+                    }
+                    if (l.mdblistList && cfg.mdblistList && !Array.isArray(l.mdblistList) && !Array.isArray(cfg.mdblistList)) {
+                        return l.mdblistList.id === cfg.mdblistList.id;
+                    }
+                    return false;
+                });
+                if (!exists) {
+                    const newCfg: CustomListConfig = {
+                        id: crypto.randomUUID(),
+                        customName: cfg.customName || 'Imported List',
+                        viewType: cfg.viewType || 'hub',
+                        thumbnailUrl: cfg.thumbnailUrl,
+                        traktList: cfg.traktList || undefined,
+                        mdblistList: cfg.mdblistList || undefined
+                    };
+                    toAdd.push(newCfg);
+                }
+            });
+            if (toAdd.length > 0) {
+                this.cache.customLists = [...this.cache.customLists, ...toAdd];
+                this.saveLocalCustomLists();
+                this.syncConfigToTrakt();
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error('Failed to import custom list from URL', e);
+            return false;
+        }
+    }
+
+    async importCustomListItemsFromUrl(listId: string, url: string): Promise<boolean> {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+            const items: MediaItem[] = Array.isArray(data) ? data : [];
+            if (items.length === 0) return false;
+            const map = this.getLocalCustomListItemsMap();
+            map[listId] = items;
+            this.setLocalCustomListItemsMap(map);
+            const key = `local:${listId}`;
+            this.cache.listItems[key as any] = { items, timestamp: Date.now() } as any;
+            return true;
+        } catch (e) {
+            console.error('Failed to import custom list items from URL', e);
+            return false;
+        }
+    }
+
+    async syncCustomListsFromUrl(): Promise<boolean> {
+        if (!this.customListsSyncUrl) return false;
+        try {
+            const resp = await fetch(this.customListsSyncUrl);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+            if (!Array.isArray(data)) return false;
+            const localStr = JSON.stringify(this.cache.customLists);
+            const remoteStr = JSON.stringify(data);
+            if (localStr !== remoteStr) {
+                this.cache.customLists = data;
+                this.saveLocalCustomLists();
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error('Failed to sync custom lists from URL', e);
+            return false;
+        }
+    }
+
+    getCustomListItemsSyncUrl(listId: string): string | null {
+        return this.customListItemsSyncUrls[listId] || null;
+    }
+
+    setCustomListItemsSyncUrl(listId: string, url: string | null) {
+        if (url) {
+            this.customListItemsSyncUrls[listId] = url;
+        } else {
+            delete this.customListItemsSyncUrls[listId];
+        }
+        localStorage.setItem('custom_list_items_sync_urls', JSON.stringify(this.customListItemsSyncUrls));
+    }
+
+    async syncCustomListItemsFromUrl(listId: string): Promise<boolean> {
+        const url = this.getCustomListItemsSyncUrl(listId);
+        if (!url) return false;
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return false;
+            const data = await resp.json();
+            const items: MediaItem[] = Array.isArray(data) ? data : [];
+            const local = this.getLocalCustomListItems(listId);
+            const localStr = JSON.stringify(local);
+            const remoteStr = JSON.stringify(items);
+            if (localStr !== remoteStr && items.length > 0) {
+                const map = this.getLocalCustomListItemsMap();
+                map[listId] = items;
+                this.setLocalCustomListItemsMap(map);
+                const key = `local:${listId}`;
+                this.cache.listItems[key as any] = { items, timestamp: Date.now() } as any;
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error('Failed to sync custom list items from URL', e);
+            return false;
+        }
+    }
 
     // Add a custom list
     addCustomList(config: Omit<CustomListConfig, 'id'>) {
@@ -400,6 +887,7 @@ class StorageService {
         const newList: CustomListConfig = {
             ...config,
             viewType, // Explicitly set it
+            showOnBrowse: config.showOnBrowse ?? false,
             id: crypto.randomUUID(),
         };
         this.cache.customLists = [...this.cache.customLists, newList];
@@ -428,19 +916,42 @@ class StorageService {
         this.syncConfigToTrakt(); // Trigger sync
     }
 
+    removeCoreNamedLists() {
+        const names = ['watchlist', 'plan to watch', 'watched', 'liked', 'favourites', 'favorites', 'favorite'];
+        this.cache.customLists = this.cache.customLists.filter(l => {
+            const n = (l.customName || '').toLowerCase();
+            return !names.some(name => n === name);
+        });
+        this.saveLocalCustomLists();
+        this.syncConfigToTrakt();
+    }
+
     // Get Items for a specific Custom List Config (handles merged lists)
-    async getListItems(config: CustomListConfig): Promise<MediaItem[]> {
-        const traktLists = Array.isArray(config.traktList) ? config.traktList : [config.traktList];
+    async getListItems(config: CustomListConfig, forceRefresh: boolean = false): Promise<MediaItem[]> {
+        if (!config.traktList && !config.mdblistList && config.customName) {
+            const name = config.customName.toLowerCase();
+            if (name === 'watchlist' || name === 'plan to watch') {
+                return [...this.cache.planToWatch];
+            }
+            if (name === 'watched') {
+                return [...this.cache.watched];
+            }
+            if (name === 'liked' || name === 'favorites' || name === 'favourites') {
+                return [...this.cache.liked];
+            }
+            return this.getLocalCustomListItems(config.id);
+        }
+        const traktLists = config.traktList ? (Array.isArray(config.traktList) ? config.traktList : [config.traktList]) : [];
         const mdbLists = config.mdblistList ? (Array.isArray(config.mdblistList) ? config.mdblistList : [config.mdblistList]) : [];
         
-        const traktIds = traktLists.map(l => l.ids.trakt);
-        const mdbIds = mdbLists.map(l => l.id);
+        const traktIds = traktLists.filter(Boolean).map(l => (l as any).ids.trakt);
+        const mdbIds = mdbLists.filter(Boolean).map(l => (l as any).id);
         
         const cacheKey = `trakt:${traktIds.sort().join(',')}|mdb:${mdbIds.sort().join(',')}`;
         const now = Date.now();
         const cached = this.cache.listItems[cacheKey];
 
-        if (cached && (now - cached.timestamp < this.LIST_CACHE_DURATION)) {
+        if (!forceRefresh && cached && (now - cached.timestamp < this.LIST_CACHE_DURATION)) {
             return cached.items;
         }
 

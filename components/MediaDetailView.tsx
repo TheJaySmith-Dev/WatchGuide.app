@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem, MediaDetail, Video, Person, CollectionDetail, Season, Episode } from '../types';
+import { MediaItem, MediaDetail, Video, Person, CollectionDetail, Season, Episode, CustomListConfig } from '../types';
 import { getMediaDetails, getImageUrl, getPersonDetails, getFanArtLogo, getCollectionDetails, getSeasonDetails } from '../services/api';
-import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight, Tv } from 'lucide-react';
+import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight, Tv, ListPlus, Layers } from 'lucide-react';
 import { storageService } from '../services/storage';
+import { mdblistService } from '../services/mdblist';
+import { traktService } from '../services/trakt';
 import ContentRow from './ContentRow';
 import SeasonView from './SeasonView';
+import AddListModal from './AddListModal';
 
 interface MediaDetailViewProps {
     item: MediaItem;
@@ -25,6 +28,9 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 
     const [logoUrl, setLogoUrl] = useState<string | null>(null);
     const [collectionParts, setCollectionParts] = useState<MediaItem[]>([]);
+    const [showAddPanel, setShowAddPanel] = useState(false);
+    const [showCreateListModal, setShowCreateListModal] = useState(false);
+    const [customLists, setCustomLists] = useState<CustomListConfig[]>([]);
     
     // Season View State
     const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
@@ -70,6 +76,10 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
             setLoading(false);
         });
     }, [item]);
+
+    useEffect(() => {
+        setCustomLists(storageService.getCustomLists());
+    }, []);
 
     // Use loaded details or fallback to basic item info
     const displayItem = details || item;
@@ -167,6 +177,18 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                 />
             )}
 
+            {showCreateListModal && (
+                <AddListModal
+                    onClose={() => setShowCreateListModal(false)}
+                    onAdded={() => {
+                        setCustomLists(storageService.getCustomLists());
+                        setShowCreateListModal(false);
+                    }}
+                    mode="create"
+                    initialProvider="create"
+                />
+            )}
+
             {showSyncPrompt && (
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-3 ring-2 ring-white/20">
                     <div className="flex items-center gap-2">
@@ -260,29 +282,169 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                             <img src={getImageUrl(displayItem.poster_path)} className="w-full h-auto" alt="Poster" />
                         </div>
 
-                        {/* Action Buttons (Moved from Hero) */}
-                        <div className="flex items-center justify-between gap-2 bg-white/5 border border-white/10 rounded-2xl p-4 shadow-xl">
+                        {/* Add to List Panel */}
+                        <div className="relative">
                             <button
-                                onClick={() => handleToggleList('planToWatch')}
-                                title="Plan to Watch"
-                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
+                                onClick={() => setShowAddPanel(v => !v)}
+                                title="Add to List"
+                                className="w-full p-3 rounded-xl border transition-all flex items-center justify-center bg-white/10 border-white/20 text-white hover:bg-white/20 gap-2"
                             >
-                                <Plus size={20} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
+                                <ListPlus size={20} />
+                                <span className="font-medium">Add to List</span>
                             </button>
-                            <button
-                                onClick={() => handleToggleList('watched')}
-                                title="Watched"
-                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                            >
-                                <Check size={20} />
-                            </button>
-                            <button
-                                onClick={() => handleToggleList('liked')}
-                                title="Like"
-                                className={`flex-1 p-3 rounded-xl border transition-all flex items-center justify-center ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                            >
-                                <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-                            </button>
+
+                            {showAddPanel && (
+                                <div className="absolute z-50 mt-2 w-full bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-3">
+                                    <div className="mb-3">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Quick Actions</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('planToWatch');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Plus size={16} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
+                                                <span>Watchlist</span>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('watched');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Check size={16} />
+                                                <span>Watched</span>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('liked');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Heart size={16} fill={isLiked ? "currentColor" : "none"} />
+                                                <span>Liked</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Your Lists</div>
+                                        <button
+                                            onClick={() => setShowCreateListModal(true)}
+                                            className="text-xs px-2 py-1 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors border border-indigo-500/30 flex items-center gap-1"
+                                        >
+                                            <Plus size={14} />
+                                            New List
+                                        </button>
+                                    </div>
+
+                                    <div className="max-h-64 overflow-y-auto pr-1">
+                                        {customLists.length === 0 ? (
+                                            <p className="text-gray-400 text-sm">No lists yet. Create a new list.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {customLists.map((cl) => {
+                                                    const traktLists = cl.traktList ? (Array.isArray(cl.traktList) ? cl.traktList : [cl.traktList]) : [];
+                                                    const mdbLists = cl.mdblistList ? (Array.isArray(cl.mdblistList) ? cl.mdblistList : [cl.mdblistList]) : [];
+                                                    const hasMultiple = traktLists.length + mdbLists.length > 1;
+                                                    return (
+                                                        <div key={cl.id} className="bg-white/5 border border-white/10 rounded-xl p-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Layers size={16} className="text-gray-400" />
+                                                                    <span className="text-sm text-white font-medium">{cl.customName}</span>
+                                                                </div>
+                                                                {!hasMultiple && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            const itemToStore = {
+                                                                                id: item.id,
+                                                                                title: item.title,
+                                                                                name: item.name,
+                                                                                poster_path: item.poster_path,
+                                                                                backdrop_path: item.backdrop_path,
+                                                                                overview: item.overview,
+                                                                                media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                vote_average: item.vote_average,
+                                                                                release_date: item.release_date,
+                                                                                first_air_date: item.first_air_date
+                                                                            };
+                                                                            if (mdbLists.length === 1) {
+                                                                                await mdblistService.addItemToList(mdbLists[0].id, itemToStore as any);
+                                                                            } else if (traktLists.length === 1) {
+                                                                                const slug = traktLists[0].ids.slug;
+                                                                                await traktService.addItemToPersonalList(slug, itemToStore as any);
+                                                                            } else {
+                                                                                storageService.addItemToLocalCustomList(cl.id, itemToStore as any);
+                                                                            }
+                                                                        }}
+                                                                        className="text-xs px-2 py-1 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors border border-indigo-500/30"
+                                                                    >
+                                                                        Add
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {hasMultiple && (
+                                                                <div className="mt-2 grid grid-cols-1 gap-1">
+                                                                    {mdbLists.map(m => (
+                                                                        <button
+                                                                            key={`mdb-${m.id}`}
+                                                                            onClick={async () => {
+                                                                                const itemToStore = {
+                                                                                    id: item.id,
+                                                                                    title: item.title,
+                                                                                    name: item.name,
+                                                                                    poster_path: item.poster_path,
+                                                                                    backdrop_path: item.backdrop_path,
+                                                                                    overview: item.overview,
+                                                                                    media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                    vote_average: item.vote_average,
+                                                                                    release_date: item.release_date,
+                                                                                    first_air_date: item.first_air_date
+                                                                                };
+                                                                                await mdblistService.addItemToList(m.id, itemToStore as any);
+                                                                            }}
+                                                                            className="w-full text-left text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 flex items-center justify-between"
+                                                                        >
+                                                                            <span>MDBList: {m.name}</span>
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    ))}
+                                                                    {traktLists.map(t => (
+                                                                        <button
+                                                                            key={`trakt-${t.ids.slug}`}
+                                                                            onClick={async () => {
+                                                                                const itemToStore = {
+                                                                                    id: item.id,
+                                                                                    title: item.title,
+                                                                                    name: item.name,
+                                                                                    poster_path: item.poster_path,
+                                                                                    backdrop_path: item.backdrop_path,
+                                                                                    overview: item.overview,
+                                                                                    media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                    vote_average: item.vote_average,
+                                                                                    release_date: item.release_date,
+                                                                                    first_air_date: item.first_air_date
+                                                                                };
+                                                                                await traktService.addItemToPersonalList(t.ids.slug, itemToStore as any);
+                                                                            }}
+                                                                            className="w-full text-left text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 flex items-center justify-between"
+                                                                        >
+                                                                            <span>Trakt: {t.name}</span>
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Streaming Info */}
@@ -535,3 +697,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 };
 
 export default MediaDetailView;
+ 
+// Inline modal rendering to create a new custom list
+// Placed outside default export to avoid cluttering main JSX; handled within component state above
+// Note: The component already conditionally sets showCreateListModal; render it near root when true

@@ -43,7 +43,7 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
     .sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0)); // Sort by rating for "Known For" feel
 
   return (
-    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-hidden">
+    <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-y-auto md:overflow-hidden">
       <button 
         onClick={onClose}
         className="absolute top-4 right-4 md:top-8 md:right-8 p-3 bg-white/10 hover:bg-white/20 text-white rounded-full z-50 backdrop-blur-sm transition-colors ring-1 ring-white/10"
@@ -51,7 +51,7 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
         <X size={24} />
       </button>
 
-      <div className="w-full h-full md:max-w-6xl md:h-[90vh] bg-black/40 md:rounded-3xl overflow-y-auto shadow-2xl relative border border-white/10 flex flex-col md:flex-row backdrop-blur-sm">
+      <div className="w-full h-full md:max-w-6xl md:h-[90vh] bg-black/40 md:rounded-3xl shadow-2xl relative border border-white/10 flex flex-col md:flex-row backdrop-blur-sm">
         
         {/* Sidebar Info */}
         <div className="w-full md:w-1/3 p-8 md:p-12 border-b md:border-b-0 md:border-r border-white/10 bg-black/20 flex flex-col items-center md:items-start shrink-0">
@@ -83,14 +83,14 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
 
             <div className="space-y-2">
                 <h3 className="text-white font-bold uppercase text-xs tracking-wider">Biography</h3>
-                <p className="text-gray-400 text-sm leading-relaxed max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                <p className="text-gray-400 text-sm leading-relaxed md:max-h-60 md:overflow-y-auto pr-2 custom-scrollbar">
                     {person.biography || "No biography available."}
                 </p>
             </div>
         </div>
 
         {/* Filmography Grid */}
-        <div className="flex-1 p-6 md:p-12 overflow-y-auto bg-transparent">
+        <div className="flex-1 p-6 md:p-12 bg-transparent">
             <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
                 <Film className="text-indigo-500" />
                 Filmography

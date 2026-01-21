@@ -1,11 +1,11 @@
 import { MediaItem } from '../types';
-import { getMediaDetails } from './api';
+import { getMediaDetails, getMediaBasic } from './api';
 
 const CLIENT_ID = 'QymIY4IxaJ7ifLgCAIfRi3VQMfnDBbLeVA6VJ4FS';
 const CLIENT_SECRET = 'Uap4U8Y4xuOu1JAfKKsgmUnS8SJSKDbmHzQLwTGOZ2bwuuLJY1OSArEMC2KstqCyBxhL9X4BOmt58rAPgvLzyAJhkpRmwv16NxOiKKkLMpAVu1SLhNu5XR59o0IofaB1';
 const AUTH_URL = 'https://mdblist.com/oauth/authorize/';
 const TOKEN_URL = 'https://api.mdblist.com/oauth/token/';
-const API_BASE = 'https://api.mdblist.com';
+const API_BASE = (typeof import.meta !== 'undefined' && (import.meta as any).env?.DEV) ? '/mdblist-api' : 'https://api.mdblist.com';
 
 const FALLBACK_LISTS = [
     { id: 18090, name: "Most Pirated Movies", items: 100, user_name: "MDBList", description: "Most downloaded movies this week" },
@@ -57,6 +57,58 @@ class MDBListService {
         // Convert to base64url
         const base64 = btoa(String.fromCharCode(...new Uint8Array(digest)));
         return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    }
+
+    private async refreshAccessToken(): Promise<boolean> {
+        const refreshToken = localStorage.getItem('mdblist_refresh_token');
+        if (!refreshToken) return false;
+        try {
+            const response = await fetch(TOKEN_URL, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                },
+                body: new URLSearchParams({
+                    grant_type: 'refresh_token',
+                    refresh_token: refreshToken,
+                    client_id: CLIENT_ID,
+                    client_secret: CLIENT_SECRET
+                })
+            });
+            const data = await response.json();
+            if (data.access_token) {
+                this.accessToken = data.access_token;
+                localStorage.setItem('mdblist_access_token', data.access_token);
+                if (data.refresh_token) {
+                    localStorage.setItem('mdblist_refresh_token', data.refresh_token);
+                }
+                return true;
+            }
+        } catch {
+            return false;
+        }
+        return false;
+    }
+
+    private async fetchWithAuth(url: string, init: RequestInit = {}) {
+        if (!this.accessToken) return new Response(null, { status: 401 });
+        const headers = {
+            'Authorization': `Bearer ${this.accessToken}`,
+            'Accept': 'application/json',
+            ...(init.headers || {})
+        } as Record<string, string>;
+        let resp = await fetch(url, { ...init, headers });
+        if (resp.status === 401) {
+            const refreshed = await this.refreshAccessToken();
+            if (refreshed && this.accessToken) {
+                const headers2 = {
+                    ...headers,
+                    'Authorization': `Bearer ${this.accessToken}`
+                };
+                resp = await fetch(url, { ...init, headers: headers2 });
+            }
+        }
+        return resp;
     }
 
     async initiateOAuth() {
@@ -136,19 +188,160 @@ class MDBListService {
         return false;
     }
 
+    async getWatchlist() {
+        if (!this.accessToken) return [];
+        try {
+            const response = await this.fetchWithAuth(`${API_BASE}/lists/watchlist/`, {});
+            if (!response.ok) return [];
+            // Assuming response is an array of items or { items: [...] }
+            // MDBList API usually returns the list object with items count, but /lists/watchlist might return items directly
+            // or the list metadata. The doc says "Get watchlist items".
+            const data = await response.json();
+            
+            if (Array.isArray(data)) {
+                const converted = this.convertToMediaItems(data);
+                return await this.enrichItems(converted);
+            }
+            if (data.items) {
+                const converted = this.convertToMediaItems(data.items);
+                return await this.enrichItems(converted);
+            }
+            const movies = Array.isArray((data as any).movies) ? (data as any).movies : [];
+            const shows = Array.isArray((data as any).shows) ? (data as any).shows : [];
+            if (movies.length > 0 || shows.length > 0) {
+                const converted = this.convertToMediaItems([...movies, ...shows]);
+                return await this.enrichItems(converted);
+            }
+            return [];
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
+    }
+
+    async getLastActivities(): Promise<{ watchlisted_at?: string } | null> {
+        if (!this.accessToken) return null;
+        try {
+            // Support both hyphen and underscore variants
+            const endpoints = [
+                `${API_BASE}/sync/last_activities/`,
+                `${API_BASE}/sync/last-activities/`
+            ];
+            for (const url of endpoints) {
+                const resp = await this.fetchWithAuth(url, {});
+                if (resp.ok) {
+                    const data = await resp.json();
+                    const watchlisted_at = (data.watchlisted_at || data.watchlistedAt || (data.watchlist && data.watchlist.updated_at)) as (string | undefined);
+                    return { watchlisted_at };
+                }
+            }
+            return null;
+        } catch (e) {
+            console.error('Failed to get MDBList last activities', e);
+            return null;
+        }
+    }
+
+    convertToMediaItems(items: any[]): MediaItem[] {
+        const mediaItems: MediaItem[] = [];
+        for (const item of items) {
+            // MDBList items usually use 'id' as TMDB ID, or 'tmdb_id'
+            const tmdbId = item.tmdb_id || item.id;
+            
+            if (tmdbId) {
+                mediaItems.push({
+                    id: tmdbId,
+                    title: item.title,
+                    name: item.title,
+                    overview: item.overview || '',
+                    poster_path: item.poster_path || null,
+                    backdrop_path: item.backdrop_path || null,
+                    media_type: item.mediatype === 'show' ? 'tv' : (item.mediatype || 'movie'),
+                    vote_average: item.score ? item.score / 10 : undefined,
+                    release_date: item.release_year ? `${item.release_year}-01-01` : undefined
+                });
+            }
+        }
+        return mediaItems;
+    }
+
     async getUserLists() {
         if (!this.accessToken) return [];
         try {
-            const response = await fetch(`${API_BASE}/lists/user/`, {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
-                }
-            });
+            const response = await this.fetchWithAuth(`${API_BASE}/lists/user/`, {});
             if (!response.ok) return [];
             return await response.json();
         } catch (e) {
             console.error(e);
             return [];
+        }
+    }
+
+    async addToWatchlist(item: MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const type = item.media_type === 'tv' ? 'show' : 'movie';
+            const body = JSON.stringify({ tmdb_id: item.id, mediatype: type });
+            const resp = await this.fetchWithAuth(`${API_BASE}/lists/watchlist/items/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            return resp.ok;
+        } catch (e) {
+            console.error('Failed to add to MDBList watchlist', e);
+            return false;
+        }
+    }
+
+    async removeFromWatchlist(item: MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const type = item.media_type === 'tv' ? 'show' : 'movie';
+            const body = JSON.stringify({ tmdb_id: item.id, mediatype: type });
+            const resp = await this.fetchWithAuth(`${API_BASE}/lists/watchlist/items/`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            return resp.ok;
+        } catch (e) {
+            console.error('Failed to remove from MDBList watchlist', e);
+            return false;
+        }
+    }
+
+    async addItemToList(listId: number, item: MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const type = item.media_type === 'tv' ? 'show' : 'movie';
+            const body = JSON.stringify({ tmdb_id: item.id, mediatype: type });
+            const resp = await this.fetchWithAuth(`${API_BASE}/lists/${listId}/items/`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            return resp.ok;
+        } catch (e) {
+            console.error(`Failed to add item to MDBList list ${listId}`, e);
+            return false;
+        }
+    }
+
+    async removeItemFromList(listId: number, item: MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const type = item.media_type === 'tv' ? 'show' : 'movie';
+            const body = JSON.stringify({ tmdb_id: item.id, mediatype: type });
+            const resp = await this.fetchWithAuth(`${API_BASE}/lists/${listId}/items/`, {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body
+            });
+            return resp.ok;
+        } catch (e) {
+            console.error(`Failed to remove item from MDBList list ${listId}`, e);
+            return false;
         }
     }
 
@@ -158,7 +351,7 @@ class MDBListService {
         try {
             const response = await fetch(`${API_BASE}/lists/top`, {
                 headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Authorization': this.accessToken ? `Bearer ${this.accessToken}` : undefined,
                     'Accept': 'application/json'
                 }
             });
@@ -179,7 +372,7 @@ class MDBListService {
         try {
             const response = await fetch(`${API_BASE}/lists/search?query=${encodeURIComponent(query)}`, {
                 headers: {
-                    'Authorization': `Bearer ${this.accessToken}`,
+                    'Authorization': this.accessToken ? `Bearer ${this.accessToken}` : undefined,
                     'Accept': 'application/json'
                 }
             });
@@ -237,56 +430,34 @@ class MDBListService {
     }
 
     async getListItems(listId: number): Promise<MediaItem[]> {
-        // Need to fetch list items. Endpoint guess: /lists/{id}/items or /lists/{id}
-        // Docs usually have /lists/{id}/items
-        // Snippet doesn't specify. I'll assume /lists/{id}/items or similar.
-        // Actually, MDBList usually returns items in the list details or a separate call.
-        // Let's try /lists/{id} first.
-        
         if (!this.accessToken) return [];
-
         try {
-            const response = await fetch(`${API_BASE}/lists/${listId}`, {
-                headers: {
-                    'Authorization': `Bearer ${this.accessToken}`
+            const respItems = await this.fetchWithAuth(`${API_BASE}/lists/${listId}/items/`, {});
+            if (respItems.ok) {
+                const data = await respItems.json();
+                let items: any[] = [];
+                if (Array.isArray(data)) {
+                    items = data;
+                } else {
+                    const movies = Array.isArray(data.movies) ? data.movies : [];
+                    const shows = Array.isArray(data.shows) ? data.shows : [];
+                    if (Array.isArray(data.items)) {
+                        items = data.items;
+                    } else {
+                        items = [...movies, ...shows];
+                    }
                 }
-            });
-            
-            if (!response.ok) return [];
-            
-            const data = await response.json();
-            // Assuming data has 'items' array.
-            // Items usually have external IDs (tmdb, imdb).
-            // We need to map them to MediaItem.
-            
-            if (!data.items) return [];
-
-            const mediaItems: MediaItem[] = [];
-            
-            // Limit to 20 for performance initially, or fetch more.
-            // MDBList items usually have { id, tmdb_id, imdb_id, title, ... }
-            
-            for (const item of data.items) {
-                if (item.tmdb_id) {
-                    // We can use the TMDB ID to get full details from our API service
-                    // But that might be too many requests.
-                    // Ideally, we construct a basic MediaItem from MDBList data
-                    
-                    mediaItems.push({
-                        id: item.tmdb_id,
-                        title: item.title,
-                        name: item.title,
-                        poster_path: item.poster_path || null, // MDBList might provide this?
-                        backdrop_path: null,
-                        overview: '',
-                        media_type: item.mediatype || (item.season ? 'tv' : 'movie'), // Guessing fields
-                        vote_average: item.score ? item.score / 10 : undefined
-                    });
+                if (items.length > 0) {
+                    const converted = this.convertToMediaItems(items);
+                    return await this.enrichItems(converted);
                 }
             }
-            
-            return mediaItems;
-
+            const respDetail = await this.fetchWithAuth(`${API_BASE}/lists/${listId}`, {});
+            if (!respDetail.ok) return [];
+            const data2 = await respDetail.json();
+            const items2 = Array.isArray(data2?.items) ? data2.items : [];
+            const converted2 = this.convertToMediaItems(items2);
+            return await this.enrichItems(converted2);
         } catch (e) {
             console.error(e);
             return [];
@@ -295,9 +466,23 @@ class MDBListService {
     
     // Helper to enrich items with TMDB data if needed
     async enrichItems(items: MediaItem[]) {
-        // Implementation to fetch details from TMDB if MDBList data is sparse
-        // For now, we'll rely on what we get or fetch on demand in the view
-        return items;
+        const enriched = await Promise.all(items.map(async (i) => {
+            if (i.poster_path || i.backdrop_path) return i;
+            const type = i.media_type === 'tv' ? 'tv' : 'movie';
+            const basic = await getMediaBasic(type, i.id);
+            if (!basic) return i;
+            return {
+                ...i,
+                poster_path: basic.poster_path || i.poster_path || null,
+                backdrop_path: basic.backdrop_path || i.backdrop_path || null,
+                title: basic.title || i.title,
+                name: basic.name || i.name,
+                overview: basic.overview || i.overview,
+                vote_average: basic.vote_average || i.vote_average,
+                release_date: basic.release_date || i.release_date
+            };
+        }));
+        return enriched;
     }
 }
 

@@ -83,7 +83,7 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
   const years = Array.from({ length: 50 }, (_, i) => currentYear - i);
 
   return (
-    <div className="min-h-screen pt-20 px-6 pb-24 md:pl-32 md:pt-12">
+    <div className="min-h-screen pt-28 px-6 pb-24 md:pl-32 md:pt-24">
       <div className="max-w-6xl mx-auto">
         
         {/* Search Bar & Filter Toggle */}
@@ -94,14 +94,14 @@ const Search: React.FC<SearchProps> = ({ onItemClick }) => {
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
                     placeholder="Search movies, shows, people..."
-                    className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-14 pr-4 text-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all"
+                    className="w-full bg-white/5 border border-white/10 rounded-full py-4 pl-14 pr-4 text-xl text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all backdrop-blur-md shadow-[0_8px_22px_rgba(0,0,0,0.35)] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]"
                     autoFocus={!showFilters}
                 />
                 <SearchIcon className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400" size={24} />
             </div>
             <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 rounded-2xl border transition-all flex items-center gap-2 ${showFilters || selectedGenre || selectedYear ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-white/5 text-gray-400 border-white/10 hover:bg-white/10'}`}
+                className={`px-4 rounded-full border transition-all flex items-center gap-2 backdrop-blur-md ${showFilters || selectedGenre || selectedYear ? 'bg-indigo-600 text-white border-indigo-500 shadow-[0_10px_28px_rgba(99,102,241,0.35)] shadow-[inset_0_-1px_0_rgba(0,0,0,0.2),inset_0_1px_0_rgba(255,255,255,0.7)]' : 'bg-white/10 text-gray-400 border-white/10 hover:bg-white/15 shadow-[0_8px_22px_rgba(0,0,0,0.35)] shadow-[inset_0_1px_0_rgba(255,255,255,0.15)]'}`}
             >
                 <Filter size={20} />
                 <span className="hidden md:inline">Filters</span>

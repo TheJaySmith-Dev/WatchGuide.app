@@ -40,7 +40,7 @@ export async function sendMessageToPoe(messages: ChatMessage[], context?: string
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'gemini-3-flash',
+                model: 'gemini-2.5-flash-lite',
                 messages: finalMessages,
             })
         });

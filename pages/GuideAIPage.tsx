@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, BrainCircuit, ChevronDown, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
+import { Bot, Send, ChevronDown, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { sendMessageToPoe } from '../services/poe';
 import { storageService } from '../services/storage';
@@ -7,45 +7,17 @@ import { storageService } from '../services/storage';
 interface ProcessedMessage {
     textParts: (string | { type: 'citation'; id: number; url: string; title: string })[];
     links: { id: number; title: string; url: string }[];
-    thought?: string;
 }
 
 const processMessage = (content: string): ProcessedMessage => {
-    let thought = '';
     let cleanContent = content;
-
-    if (content.trimStart().startsWith('Thinking...') || content.includes('Type:')) {
-        const lines = content.split('\n');
-        const thoughtLines: string[] = [];
-        const messageLines: string[] = [];
-        let isThinkingBlock = true;
-
-        for (const line of lines) {
-            const trimmed = line.trim();
-            if (isThinkingBlock) {
-                if (trimmed.startsWith('Thinking...') || trimmed.startsWith('>') || trimmed === '' || trimmed.includes(' > ')) {
-                    thoughtLines.push(line);
-                } else {
-                    isThinkingBlock = false;
-                    messageLines.push(line);
-                }
-            } else {
-                messageLines.push(line);
-            }
-        }
-
-        if (thoughtLines.length > 0) {
-            thought = thoughtLines.join('\n').trim();
-            cleanContent = messageLines.join('\n').trim();
-        }
-    }
 
     const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
     const rawUrlRegex = /https?:\/\/[^\s]+/g;
     const links: { id: number; title: string; url: string }[] = [];
     let citationCount = 0;
 
-    let processedContent = cleanContent.replace(linkRegex, (match, title, url) => {
+    let processedContent = cleanContent.replace(linkRegex, (_, title, url) => {
         citationCount++;
         links.push({ id: citationCount, title, url });
         return title;
@@ -65,8 +37,7 @@ const processMessage = (content: string): ProcessedMessage => {
 
     return {
         textParts: [processedContent],
-        links,
-        thought
+        links
     };
 };
 
@@ -79,8 +50,6 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [activePopupIndex, setActivePopupIndex] = useState<number | null>(null);
-    const [expandedThoughts, setExpandedThoughts] = useState<Set<number>>(new Set());
-
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
 
@@ -88,19 +57,19 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         if (messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
         }
-    }, [messages, activePopupIndex, expandedThoughts]);
-
+    }, [messages, activePopupIndex]);
     useEffect(() => {
         function handleClickOutside(event: MouseEvent) {
             if (popupRef.current && !popupRef.current.contains(event.target as Node)) {
-                setActivePopupIndex(null);
             }
+                setActivePopupIndex(null);
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
+
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isLoading) return;
@@ -115,7 +84,6 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         setMessages(prev => [...prev, userMessage]);
         setInputValue('');
         setIsLoading(true);
-
         try {
             const likedItems = await storageService.getList('liked');
             const likedContext = likedItems.length > 0
@@ -150,14 +118,7 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         }
     };
 
-    const toggleThought = (idx: number) => {
-        setExpandedThoughts(prev => {
-            const next = new Set(prev);
-            if (next.has(idx)) next.delete(idx);
-            else next.add(idx);
-            return next;
-        });
-    };
+    // no-op: reasoning UI removed
 
     const getHostname = (url: string) => {
         try {
@@ -177,6 +138,8 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                 </button>
             </div>
 
+            
+
             <div className="flex-1 overflow-y-auto space-y-6 pb-4 pt-12 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent px-2">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center text-white/40 space-y-4 px-6">
@@ -188,33 +151,16 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                     </div>
                 ) : (
                     messages.map((msg, idx) => {
-                        const { textParts, links, thought } = msg.role === 'assistant'
+                        const { textParts, links } = msg.role === 'assistant'
                             ? processMessage(msg.content)
-                            : { textParts: [msg.content], links: [], thought: '' };
+                            : { textParts: [msg.content], links: [] };
 
                         const isPopupOpen = activePopupIndex === idx;
-                        const isThoughtExpanded = expandedThoughts.has(idx);
+                        // reasoning UI removed
 
                         return (
                             <div key={idx} className="flex flex-col w-full">
-                                {thought && (
-                                    <div className="mb-3 max-w-full px-1">
-                                        <button
-                                            onClick={() => toggleThought(idx)}
-                                            className="flex items-center gap-2 text-[11px] text-white/30 hover:text-white/50 transition-colors mb-1 w-full"
-                                        >
-                                            <BrainCircuit size={12} className="text-indigo-500/50" />
-                                            <span className="font-medium uppercase tracking-wider">Reasoning Process</span>
-                                            <div className="h-px bg-white/5 flex-1 mx-2" />
-                                            <ChevronDown size={12} className={`transition-transform duration-200 ${isThoughtExpanded ? 'rotate-180' : ''}`} />
-                                        </button>
-                                        <div className={`overflow-hidden transition-all duration-300 ${isThoughtExpanded ? 'max-h-[500px] opacity-100' : 'max-h-0 opacity-0'}`}>
-                                            <div className="bg-[#111] border border-white/5 rounded-lg p-3 text-[10px] text-white/50 font-mono leading-relaxed whitespace-pre-wrap shadow-inner">
-                                                {thought}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
+                                
 
                                 <div className={`relative flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                                     {textParts.some(p => typeof p === 'string' && p.trim()) && (

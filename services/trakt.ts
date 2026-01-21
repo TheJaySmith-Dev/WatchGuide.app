@@ -584,6 +584,63 @@ class TraktService {
             return [];
         }
     }
+
+    // Add item to a personal Trakt list by slug or id
+    async addItemToPersonalList(listIdOrSlug: number | string, item: import('../types').MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const mediaType = item.media_type === 'movie' ? 'movies' : 'shows';
+            const payload: any = {
+                [mediaType]: [{
+                    ids: { tmdb: item.id },
+                    title: item.title || item.name,
+                    year: item.release_date ? new Date(item.release_date).getFullYear() :
+                        item.first_air_date ? new Date(item.first_air_date).getFullYear() : undefined,
+                }]
+            };
+            const response = await fetch(`${TRAKT_API_URL}/users/me/lists/${listIdOrSlug}/items`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+                body: JSON.stringify(payload),
+            });
+            return response.ok;
+        } catch (error) {
+            console.error('Add item to personal Trakt list error:', error);
+            return false;
+        }
+    }
+
+    // Remove item from a personal Trakt list by slug or id
+    async removeItemFromPersonalList(listIdOrSlug: number | string, item: import('../types').MediaItem): Promise<boolean> {
+        if (!this.accessToken) return false;
+        try {
+            const mediaType = item.media_type === 'movie' ? 'movies' : 'shows';
+            const payload: any = {
+                [mediaType]: [{
+                    ids: { tmdb: item.id }
+                }]
+            };
+            const response = await fetch(`${TRAKT_API_URL}/users/me/lists/${listIdOrSlug}/items/remove`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.accessToken}`,
+                    'trakt-api-version': '2',
+                    'trakt-api-key': TRAKT_CLIENT_ID,
+                },
+                body: JSON.stringify(payload),
+            });
+            return response.ok;
+        } catch (error) {
+            console.error('Remove item from personal Trakt list error:', error);
+            return false;
+        }
+    }
 }
 
 export const traktService = new TraktService();
