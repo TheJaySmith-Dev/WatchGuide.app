@@ -97,18 +97,22 @@ class MDBListService {
             'Accept': 'application/json',
             ...(init.headers || {})
         } as Record<string, string>;
-        let resp = await fetch(url, { ...init, headers });
-        if (resp.status === 401) {
-            const refreshed = await this.refreshAccessToken();
-            if (refreshed && this.accessToken) {
-                const headers2 = {
-                    ...headers,
-                    'Authorization': `Bearer ${this.accessToken}`
-                };
-                resp = await fetch(url, { ...init, headers: headers2 });
+        try {
+            let resp = await fetch(url, { ...init, headers });
+            if (resp.status === 401) {
+                const refreshed = await this.refreshAccessToken();
+                if (refreshed && this.accessToken) {
+                    const headers2 = {
+                        ...headers,
+                        'Authorization': `Bearer ${this.accessToken}`
+                    };
+                    resp = await fetch(url, { ...init, headers: headers2 });
+                }
             }
+            return resp;
+        } catch {
+            return new Response(null, { status: 0 });
         }
-        return resp;
     }
 
     async initiateOAuth() {

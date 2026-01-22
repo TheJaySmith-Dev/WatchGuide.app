@@ -90,7 +90,7 @@ const PersonDetailView: React.FC<PersonDetailViewProps> = ({ personId, onClose, 
         </div>
 
         {/* Filmography Grid */}
-        <div className="flex-1 p-6 md:p-12 bg-transparent">
+        <div className="flex-1 p-6 md:p-12 bg-transparent overflow-y-auto pr-2">
             <h2 className="text-2xl font-bold text-white mb-8 flex items-center gap-3">
                 <Film className="text-indigo-500" />
                 Filmography

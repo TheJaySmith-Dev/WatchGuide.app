@@ -1,4 +1,5 @@
 import React from 'react';
+import LiquidGlass from 'liquid-glass-react';
 import { ArrowLeft, Rocket, Zap, Layout, Sparkles, BrainCircuit } from 'lucide-react';
 
 interface Release {
@@ -14,6 +15,50 @@ interface Release {
 }
 
 const releases: Release[] = [
+    {
+        version: "2.0.1",
+        date: "January 21, 2026",
+        title: "Stability & Bug Fixes",
+        features: [
+            {
+                title: "Hero Carousel Stability",
+                description: "Fixed frequent trailer skipping and improved slide timing for smoother transitions.",
+                icon: Rocket,
+                color: "text-indigo-400 bg-indigo-500/10"
+            },
+            {
+                title: "Scrollable Filmography",
+                description: "Made the actor filmography section scrollable so all credits are viewable.",
+                icon: Layout,
+                color: "text-blue-400 bg-blue-500/10"
+            }
+        ]
+    },
+    {
+        version: "2.0.0",
+        date: "January 2026",
+        title: "Cinematic Hero Update",
+        features: [
+            {
+                title: "Top 5 New + Top 5 Trending",
+                description: "A deterministic hero mix showcasing 5 New (Now Playing) and 5 Trending titles.",
+                icon: Rocket,
+                color: "text-rose-400 bg-rose-500/10"
+            },
+            {
+                title: "Category Embeds Under Title",
+                description: "Prominent New/Trending badges placed under the title logo for instant context.",
+                icon: Sparkles,
+                color: "text-amber-400 bg-amber-500/10"
+            },
+            {
+                title: "Trailer Playback Improvements",
+                description: "Smarter fallback timing when no trailer is available; more consistent playback behavior.",
+                icon: Zap,
+                color: "text-green-400 bg-green-500/10"
+            }
+        ]
+    },
     {
         version: "1.2.0",
         date: "January 20, 2026",
@@ -57,8 +102,8 @@ const releases: Release[] = [
                 color: "text-purple-400 bg-purple-500/10"
             },
             {
-                title: "GuideAI Full Experience",
-                description: "GuideAI now has its own dedicated full-screen home. Have deeper, distraction-free conversations with your personal movie assistant.",
+                title: "Chron Full Experience",
+                description: "Chron now has its own dedicated full-screen home. Have deeper, distraction-free conversations with your personal movie assistant.",
                 icon: BrainCircuit,
                 color: "text-pink-400 bg-pink-500/10"
             },
@@ -113,6 +158,24 @@ const ReleaseNotesPage: React.FC<ReleaseNotesPageProps> = ({ onBack }) => {
 
                 {/* Timeline */}
                 <div className="space-y-12 relative before:absolute before:left-8 md:before:left-1/2 before:top-0 before:bottom-0 before:w-px before:bg-white/10 before:-translate-x-1/2">
+                    <div className="mb-8 flex justify-center">
+                        <LiquidGlass
+                            displacementScale={64}
+                            blurAmount={0.1}
+                            saturation={130}
+                            aberrationIntensity={2}
+                            elasticity={0.3}
+                            cornerRadius={20}
+                            padding="10px 16px"
+                            className="cursor-default"
+                            style={{ display: 'inline-block' }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <Rocket size={18} className="text-indigo-400" />
+                                <span className="text-white text-sm font-medium">Liquid Glass Enabled</span>
+                            </div>
+                        </LiquidGlass>
+                    </div>
                     {releases.map((release, idx) => (
                         <div key={idx} className="relative flex flex-col md:flex-row gap-8 md:gap-0 group">
                             
@@ -156,7 +219,7 @@ const ReleaseNotesPage: React.FC<ReleaseNotesPageProps> = ({ onBack }) => {
                 </div>
 
                 <div className="text-center mt-24 text-gray-600 text-sm pb-12">
-                    <p>Built with ❤️ by GuideAI</p>
+                    <p>Built with ❤️ by Chron</p>
                 </div>
 
             </div>

@@ -269,8 +269,14 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
     );
   }
 
-  // Determine Hero Items: Use Trending, fallback to Now Playing, then Popular Shows
-  const heroItems = trending.length > 0 ? trending.slice(0, 10) : (nowPlayingMovies.length > 0 ? nowPlayingMovies : popularShows);
+  // Determine Hero Slides: Top 5 New + Top 5 Trending (simple order, less complex)
+  const newFive: MediaItem[] = nowPlayingMovies.slice(0, 5);
+  const trendingSource: MediaItem[] = (trending.length > 0 ? trending : popularShows);
+  const trendingFive: MediaItem[] = trendingSource.slice(0, 5);
+  const heroSlides = [
+    ...newFive.map(item => ({ item, category: 'new' as const })),
+    ...trendingFive.map(item => ({ item, category: 'trending' as const }))
+  ];
 
   // Filter lists based on viewType and showOnBrowse flag
   const hubLists = customLists.filter(l => l.viewType !== 'row' && l.showOnBrowse !== false);
@@ -316,7 +322,7 @@ const Browse: React.FC<BrowseProps> = ({ onItemClick, selectedListId, onListClos
 
   return (
     <div className="pb-24 md:pb-0">
-      <HeroCarousel items={heroItems} onItemClick={onItemClick} />
+      <HeroCarousel items={heroSlides} onItemClick={onItemClick} />
 
       <div className="-mt-16 md:-mt-32 relative z-30 space-y-8 pb-10">
 

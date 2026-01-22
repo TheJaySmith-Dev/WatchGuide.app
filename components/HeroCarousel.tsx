@@ -4,7 +4,7 @@ import { getImageUrl, getFanArtLogo, getVideos } from '../services/api';
 import YouTube, { YouTubeProps } from 'react-youtube';
 
 interface HeroCarouselProps {
-  items: MediaItem[];
+  items: { item: MediaItem; category: 'new' | 'trending' }[];
   onItemClick: (item: MediaItem) => void;
 }
 
@@ -27,7 +27,9 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
 
   // Initial Auto-Advance (fallback) logic handled in the video effect
   
-  const activeItem = items && items.length > 0 ? items[activeIndex] : null;
+  const activeSlide = items && items.length > 0 ? items[activeIndex] : null;
+  const activeItem: MediaItem | null = activeSlide ? activeSlide.item : null;
+  const activeCategory: 'new' | 'trending' | null = activeSlide ? activeSlide.category : null;
 
   const nextSlide = () => {
       // Clear all timers immediately to prevent race conditions
@@ -44,22 +46,25 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       setVideoKey(null);
       skipScheduledRef.current = false; // Reset skip schedule
       
-      // Start a fallback timer in case video doesn't load or exist
-      // We'll clear this if a video is found and starts playing
-      timerRef.current = setTimeout(nextSlide, 10000); 
-
       // Fetch Logo
       getFanArtLogo(activeItem.media_type as 'movie' | 'tv' || 'movie', activeItem.id)
         .then(setLogoUrl);
 
-      // Fetch Trailer
+      // Fetch Trailer, and only set a fallback timer if no trailer is found
       getVideos(activeItem.media_type as 'movie' | 'tv' || 'movie', activeItem.id)
         .then(videos => {
             const trailer = videos.find((v: any) => v.type === 'Trailer' && v.site === 'YouTube') || 
                             videos.find((v: any) => v.type === 'Teaser' && v.site === 'YouTube');
             if (trailer) {
                 setVideoKey(trailer.key);
+            } else {
+                // No trailer: advance after 10s
+                timerRef.current = setTimeout(nextSlide, 10000);
             }
+        })
+        .catch(() => {
+            // If fetching videos fails, still schedule fallback
+            timerRef.current = setTimeout(nextSlide, 10000);
         });
     }
     
@@ -101,17 +106,17 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
     if (items.length > 0) {
       const nextIndex = (activeIndex + 1) % items.length;
       const nextItem = items[nextIndex];
-      if (nextItem && nextItem.backdrop_path) {
+      if (nextItem && nextItem.item && nextItem.item.backdrop_path) {
         const img = new Image();
-        img.src = getImageUrl(nextItem.backdrop_path, 'original'); // High res for next
+        img.src = getImageUrl(nextItem.item.backdrop_path, 'original'); // High res for next
       }
       
       // Also preload the one after that with lower res to warm up connection
       const nextNextIndex = (activeIndex + 2) % items.length;
       const nextNextItem = items[nextNextIndex];
-      if (nextNextItem && nextNextItem.backdrop_path) {
+      if (nextNextItem && nextNextItem.item && nextNextItem.item.backdrop_path) {
           const imgSmall = new Image();
-          imgSmall.src = getImageUrl(nextNextItem.backdrop_path, 'w1280'); // Medium res
+          imgSmall.src = getImageUrl(nextNextItem.item.backdrop_path, 'w1280'); // Medium res
       }
     }
   }, [activeIndex, items]);
@@ -200,9 +205,11 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
       onClick={() => onItemClick(activeItem)}
     >
       {/* Background Image Layer */}
-      {items.map((item, index) => (
+      {items.map((slide, index) => {
+        const item = slide.item;
+        return (
         <div
-          key={item.id}
+          key={`${slide.category}-${item.id}-${index}`}
           className={`absolute inset-0 transition-opacity duration-[1500ms] ease-in-out ${index === activeIndex ? 'opacity-100 z-10' : 'opacity-0 z-0'
             }`}
         >
@@ -220,7 +227,8 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
           <div className="absolute inset-0 bg-gradient-to-t from-[#050505] via-[#050505]/40 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-[#050505]/80 via-transparent to-transparent md:via-[#050505]/20" />
         </div>
-      ))}
+      );
+      })}
 
       {/* Persistent Video Layer */}
       <div className={`absolute inset-0 overflow-hidden pointer-events-none z-0 transition-opacity duration-1000 ${isPlaying ? 'opacity-100' : 'opacity-0'}`}>
@@ -250,6 +258,33 @@ const HeroCarousel: React.FC<HeroCarouselProps> = ({ items, onItemClick }) => {
             <h1 className="text-4xl md:text-6xl font-extrabold text-white mb-6 drop-shadow-xl max-w-2xl leading-tight tracking-tight">
               {activeItem.title || activeItem.name}
             </h1>
+          )}
+        </div>
+
+        {/* Embed under logo/title based on category */}
+        <div className="transition-opacity duration-700 opacity-100">
+          {activeCategory && (
+            <div className="mt-2">
+              {activeCategory === 'new' ? (
+                <div className="h-16 md:h-20 lg:h-24 flex items-center">
+                  <img
+                    src="https://i.ibb.co/JRL4xvMm/Chat-GPT-Image-Jan-21-2026-at-02-58-51-PM.png"
+                    alt="New"
+                    className="h-full object-contain drop-shadow-[0_10px_22px_rgba(0,0,0,0.4)]"
+                    onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+                  />
+                </div>
+              ) : (
+                <div className="h-16 md:h-20 lg:h-24 flex items-center">
+                  <img
+                    src="https://i.ibb.co/gbmYk2tH/Chat-GPT-Image-Jan-21-2026-at-08-58-46-PM.png"
+                    alt="Trending"
+                    className="h-full object-contain drop-shadow-[0_10px_22px_rgba(0,0,0,0.4)]"
+                    onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+                  />
+                </div>
+              )}
+            </div>
           )}
         </div>
 

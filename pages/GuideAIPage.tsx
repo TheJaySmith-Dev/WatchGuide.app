@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Send, ChevronDown, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
+import { Send, ChevronDown, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
 import { ChatMessage } from '../types';
 import { sendMessageToPoe } from '../services/poe';
 import { storageService } from '../services/storage';
@@ -49,6 +49,18 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [inputValue, setInputValue] = useState('');
     const [isLoading, setIsLoading] = useState(false);
+    const [model, setModel] = useState<string>(() => {
+        const saved = localStorage.getItem('guideai_model') || 'gemini-2.5-flash-lite';
+        if (saved === 'grok-4-fast-reasoning' || saved === 'grok-4.1-fast-reasoning') {
+            return 'gpt-4o-mini-search';
+        }
+        return saved;
+    });
+    const [webSearch, setWebSearch] = useState<boolean>(() => {
+        const saved = localStorage.getItem('guideai_web_search');
+        if (saved === 'false') return false;
+        return true;
+    });
     const [activePopupIndex, setActivePopupIndex] = useState<number | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
@@ -70,6 +82,21 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         };
     }, []);
 
+    const chooseModelAndWebSearch = (query: string): { model: string; web: boolean } => {
+        const q = query.toLowerCase();
+        const needsWeb =
+            /\b(latest|today|tonight|news|update|released|release date|box office|ratings|reviews|where to watch|streaming|available on|imdb|rotten|metacritic|official trailer|watch online|link|source|cite|reference|top|trending|rank)\b/.test(q);
+        const isLocalReco =
+            /\b(recommend|suggest|similar to|like|based on my likes|for me|personalized|find movies like|what should i watch)\b/.test(q);
+        if (needsWeb) {
+            return { model: 'gpt-4o-mini-search', web: true };
+        }
+        if (isLocalReco) {
+            return { model: 'gemini-2.5-flash-lite', web: false };
+        }
+        // Default: respect current webSearch toggle; prefer search model if enabled
+        return webSearch ? { model: 'gpt-4o-mini-search', web: true } : { model: 'gemini-2.5-flash-lite', web: false };
+    };
 
     const handleSendMessage = async () => {
         if (!inputValue.trim() || isLoading) return;
@@ -90,9 +117,12 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                 ? `\n\nUser's Liked Movies/Shows (for algorithm): ${likedItems.map(i => i.title || i.name).join(', ')}`
                 : '';
 
+            const auto = model === 'auto' ? chooseModelAndWebSearch(userMessage.content) : { model, web: webSearch };
             const responseContent = await sendMessageToPoe(
                 [...messages, userMessage],
-                likedContext + "\n\nCRITICAL: The Simkl integration has been COMPLETELY REMOVED. THE APP NOW USES PRIVACY-FIRST LOCAL STORAGE ONLY. Do NOT mention Simkl, accounts, or logging in. If the user asks to add to a list, tell them to use the '+' (Want to Watch), 'Check' (Watched), or 'Heart' (Like) buttons in the detail view. Use the user's Liked items to personalize recommendations based on their local preferences."
+                likedContext + "\n\nCRITICAL: The Simkl integration has been COMPLETELY REMOVED. THE APP NOW USES PRIVACY-FIRST LOCAL STORAGE ONLY. Do NOT mention Simkl, accounts, or logging in. If the user asks to add to a list, tell them to use the '+' (Want to Watch), 'Check' (Watched), or 'Heart' (Like) buttons in the detail view. Use the user's Liked items to personalize recommendations based on their local preferences.",
+                auto.model,
+                auto.web
             );
 
             const displayContent = responseContent.replace(/\[ACTION: [A-Z_]+\]/g, '').trim();
@@ -129,7 +159,7 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
     };
 
     return (
-        <div className="min-h-screen pt-24 pb-24 px-4 md:pl-32 bg-[#050505] flex flex-col max-w-5xl mx-auto h-screen relative">
+        <div className="min-h-[100dvh] pt-24 pb-24 px-4 md:pl-32 bg-[#050505] flex flex-col max-w-5xl mx-auto h-[100dvh] relative">
             
             {/* Header with Back Button */}
             <div className="absolute top-24 left-4 md:left-32 z-10">
@@ -143,11 +173,50 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
             <div className="flex-1 overflow-y-auto space-y-6 pb-4 pt-12 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent px-2">
                 {messages.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-center text-white/40 space-y-4 px-6">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center mb-4 shadow-lg shadow-indigo-500/20">
-                            <Bot size={32} className="text-white" />
+                        <div className="w-16 h-16 rounded-2xl overflow-hidden mb-4 shadow-lg shadow-indigo-500/20 border border-white/10 bg-white/10 flex items-center justify-center">
+                            <img
+                                src="https://i.ibb.co/kVmNhyjv/Chat-GPT-Image-Jan-22-2026-at-07-40-09-PM.png"
+                                alt="Chron"
+                                className="w-full h-full object-cover"
+                                onError={(e) => ((e.target as HTMLImageElement).style.display = 'none')}
+                            />
                         </div>
-                        <h2 className="text-2xl font-bold text-white">GuideAI Assistant</h2>
+                        <h2 className="text-2xl font-bold text-white">Chron</h2>
                         <p className="text-base max-w-md">I've analyzed your liked titles to provide personalized suggestions. Ask me anything about movies or TV shows!</p>
+                        <div className="mt-4">
+                            <label className="text-xs text-white/40 mr-2">Model</label>
+                            <select
+                                value={model}
+                                onChange={(e) => {
+                                    const val = e.target.value;
+                                    setModel(val);
+                                    localStorage.setItem('guideai_model', val);
+                                }}
+                                className="bg-white/10 text-white text-sm px-3 py-2 rounded-lg border border-white/10"
+                            >
+                                <option value="auto">Auto (Best)</option>
+                                <option value="gemini-2.5-flash-lite">Gemini Flash Lite</option>
+                                <option value="gpt-4o-mini-search">GPT-4o-mini-Search</option>
+                            </select>
+                            {model !== 'auto' && (
+                                <>
+                                    <label className="text-xs text-white/40 ml-4 mr-2">Web Search</label>
+                                    <div
+                                        className={`w-12 h-6 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
+                                        onClick={() => {
+                                            const val = !webSearch;
+                                            setWebSearch(val);
+                                            localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
+                                        }}
+                                        title="Web Search"
+                                    >
+                                        <div
+                                            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-6' : 'translate-x-0'}`}
+                                        />
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 ) : (
                     messages.map((msg, idx) => {
@@ -253,17 +322,51 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                 <div ref={messagesEndRef} />
             </div>
 
-            <div className="p-4 border-t border-white/10 bg-[#050505]/80 backdrop-blur-md sticky bottom-0">
-                <div className="relative flex items-center max-w-4xl mx-auto w-full">
+            <div className="fixed left-0 right-0 z-[220] p-2" style={{ bottom: 'calc(env(safe-area-inset-bottom) + 12px)' }}>
+                <div className="relative flex items-center max-w-4xl mx-auto w-full px-2">
                     <input
                         type="text"
                         value={inputValue}
                         onChange={(e) => setInputValue(e.target.value)}
                         onKeyDown={handleKeyDown}
                         placeholder="Ask something..."
-                        className="w-full bg-white/5 text-white placeholder-white/30 rounded-2xl pl-6 pr-14 py-4 text-base focus:outline-none focus:ring-1 focus:ring-indigo-500/50 border border-white/10 transition-all shadow-lg"
+                        className="w-full bg-white/5 text-white placeholder-white/30 rounded-xl pl-6 pr-14 py-4 text-base focus:outline-none focus:ring-1 focus:ring-indigo-500/50 border border-white/10 transition-all shadow-lg"
                         autoFocus
                     />
+                    <div className="absolute right-40 flex items-center gap-2 hidden md:flex">
+                        <select
+                            value={model}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setModel(val);
+                                localStorage.setItem('guideai_model', val);
+                            }}
+                            className="bg-white/10 text-white text-xs px-2 py-2 rounded-lg border border-white/10"
+                            title="AI Model"
+                        >
+                            <option value="auto">Auto (Best)</option>
+                            <option value="gemini-2.5-flash-lite">Gemini Flash Lite</option>
+                            <option value="gpt-4o-mini-search">GPT-4o-mini-Search</option>
+                        </select>
+                        {model !== 'auto' && (
+                            <>
+                                <label className="text-white/40 text-[11px]">Web</label>
+                                <div
+                                    className={`w-10 h-5 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
+                                    onClick={() => {
+                                        const val = !webSearch;
+                                        setWebSearch(val);
+                                        localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
+                                    }}
+                                    title="Web Search"
+                                >
+                                    <div
+                                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-5' : 'translate-x-0'}`}
+                                    />
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <button
                         onClick={handleSendMessage}
                         disabled={!inputValue.trim() || isLoading}

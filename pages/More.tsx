@@ -1,14 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { getTrendingPeople, getImageUrl, getGenres } from '../services/api';
 import { Person, TraktUser } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database, Film, Tv, Clock, PieChart } from 'lucide-react';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database } from 'lucide-react';
 import { storageService } from '../services/storage';
 import { simklService } from '../services/simkl';
 import { traktService } from '../services/trakt';
 import { mdblistService } from '../services/mdblist';
 import ListsPage from './ListsPage';
 
-import GuideAIPage from './GuideAIPage';
 import ReleaseNotesPage from './ReleaseNotesPage';
 
 interface MoreProps {
@@ -42,7 +41,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
     const [showLists, setShowLists] = useState(false);
-    const [showGuideAI, setShowGuideAI] = useState(false);
+    // Chron now navigates via hash route
     const [showReleaseNotes, setShowReleaseNotes] = useState(false);
     const [mdbAuthenticated, setMdbAuthenticated] = useState(false);
 
@@ -103,9 +102,9 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
     // Notify parent when lists view is toggled
     useEffect(() => {
         if (onListsToggle) {
-            onListsToggle(showLists || showGuideAI || showReleaseNotes);
+            onListsToggle(showLists || showReleaseNotes);
         }
-    }, [showLists, showGuideAI, showReleaseNotes, onListsToggle]);
+    }, [showLists, showReleaseNotes, onListsToggle]);
 
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
 
@@ -121,73 +120,34 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
   }
 
 
-    if (showGuideAI) {
-        return <GuideAIPage onBack={() => setShowGuideAI(false)} />;
-    }
+    // Chron is a dedicated page: navigate via hash '#/chron'
 
     if (showReleaseNotes) {
         return <ReleaseNotesPage onBack={() => setShowReleaseNotes(false)} />;
     }
 
     return (
-        <div className="min-h-screen pt-24 px-6 pb-24 md:pl-32 md:pt-24 bg-[#050505]">
+        <div className="min-h-[100dvh] pt-24 px-6 pb-24 md:pl-32 md:pt-24 bg-[#050505]">
 
             {/* Subscriptions */}
             {/* Removed per user request */}
 
-            {/* Stats Widgets */}
-                        <div className="grid grid-cols-2 md:flex md:flex-wrap gap-3 md:gap-4 mb-8">
-                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
-                                <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400 mb-2 md:mb-0">
-                                    <Film size={20} />
-                                </div>
-                                <div className="text-center md:text-left">
-                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.movies}</span>
-                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Movies</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
-                                <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400 mb-2 md:mb-0">
-                                    <Tv size={20} />
-                                </div>
-                                <div className="text-center md:text-left">
-                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.shows}</span>
-                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Shows</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
-                                <div className="p-2 bg-blue-500/20 rounded-lg text-blue-400 mb-2 md:mb-0">
-                                    <Clock size={20} />
-                                </div>
-                                <div className="text-center md:text-left">
-                                    <span className="block text-xl md:text-2xl font-bold text-white">{stats.hours}h</span>
-                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Time</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-col md:flex-row items-center md:gap-3 bg-white/5 border border-white/10 rounded-xl p-3 md:px-5 md:py-3">
-                                <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400 mb-2 md:mb-0">
-                                    <PieChart size={20} />
-                                </div>
-                                <div className="text-center md:text-left">
-                                    <span className="block text-lg md:text-xl font-bold text-white line-clamp-1 max-w-[80px] md:max-w-[100px]">{stats.topGenre}</span>
-                                    <span className="text-[10px] md:text-xs text-gray-400 uppercase font-bold tracking-wider">Top Genre</span>
-                                </div>
-                            </div>
-                        </div>
 
             {/* Features Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Features</h2>
                 <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
                     <button
-                        onClick={() => setShowGuideAI(true)}
+                        onClick={() => {
+                            window.location.hash = '#/chron';
+                        }}
                         className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
                     >
                         <div className="flex items-center gap-3">
                             <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
                                 <BrainCircuit size={20} />
                             </div>
-                            <span className="text-white">GuideAI Assistant</span>
+                            <span className="text-white">Chron</span>
                         </div>
                         <ChevronRight size={16} className="text-gray-400" />
                     </button>
@@ -366,7 +326,7 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <span className="text-white">What's New</span>
                         </div>
                         <div className="flex items-center gap-2 text-gray-400">
-                            <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30">v1.1.0</span>
+                            <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30">v2.0.1</span>
                             <ChevronRight size={16} />
                         </div>
                     </button>

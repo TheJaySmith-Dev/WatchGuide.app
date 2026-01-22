@@ -52,7 +52,7 @@ const FALLBACK_DATA: MediaItem[] = [
 // --- Image Helpers ---
 
 export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w185' | 'w1280' = 'w500') => {
-  if (!path) return 'https://via.placeholder.com/500x750?text=No+Image';
+  if (!path) return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAwAAAAQACAYAAAAzOeKqAAAAAklEQVR4nO3BMQEAAADCoPVPbQhPoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwQwQzAAEugzCqAAAAAElFTkSuQmCC';
   if (path.startsWith('http')) return path; // Return full URLs as is
   if (path.startsWith('data:image')) return path; // Return data URIs as is (for user uploads)
   

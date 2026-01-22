@@ -5,6 +5,7 @@ import Search from './pages/Search';
 import More from './pages/More';
 import MyList from './pages/MyList';
 import Countdown from './pages/Countdown';
+import GuideAIPage from './pages/GuideAIPage';
 import MediaDetailView from './components/MediaDetailView';
 import PersonDetailView from './components/PersonDetailView';
 import CollectionDetailView from './components/CollectionDetailView';
@@ -178,6 +179,8 @@ const App: React.FC = () => {
             handleMediaClick(item);
           }
         }} />;
+      case 'chron':
+        return <GuideAIPage onBack={() => handleTabChange('browse')} />;
       case 'more':
         return (
           <More
@@ -207,7 +210,7 @@ const App: React.FC = () => {
       <TabBar 
         activeTab={activeTab} 
         onTabChange={handleTabChange} 
-        hideOnDesktop={selectedCollectionId !== null || isListsViewOpen} // Hide on list view (handled inside 'more' logic)
+        hide={(selectedItem !== null) || (selectedPersonId !== null) || (selectedCollectionId !== null) || isListsViewOpen}
       />
 
       {/* Media Detail Overlay */}
