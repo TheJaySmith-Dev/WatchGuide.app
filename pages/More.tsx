@@ -1,17 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { getTrendingPeople, getImageUrl } from '../services/api';
-import { Person } from '../types';
-import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User } from 'lucide-react';
+import { getTrendingPeople, getImageUrl, getGenres } from '../services/api';
+import { Person, TraktUser } from '../types';
+import { ChevronRight, Globe, Settings, Check, X, LogIn, LogOut, User, Crown, RefreshCw, Timer, List, BrainCircuit, Sparkles, Database } from 'lucide-react';
 import { storageService } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
 import { simklService } from '../services/simkl';
-import GuideAIBot from '../components/GuideAIBot';
+import { traktService } from '../services/trakt';
+import { mdblistService } from '../services/mdblist';
+import ListsPage from './ListsPage';
+
+import ReleaseNotesPage from './ReleaseNotesPage';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
     currentRegion: string;
     onRegionChange: (region: string) => void;
     simklUser?: any;
+    traktUser?: TraktUser | null;
+    onCountdownClick?: () => void;
+    onListsToggle?: (isOpen: boolean) => void;
 }
 
 const regions = [
@@ -31,31 +37,152 @@ const regions = [
     { code: 'IT', name: 'Italy' },
 ];
 
-const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser }) => {
+const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChange, simklUser, traktUser, onCountdownClick, onListsToggle }) => {
     const [people, setPeople] = useState<Person[]>([]);
     const [showRegions, setShowRegions] = useState(false);
-    const [simklSyncEnabled, setSimklSyncEnabled] = useState(storageService.isSimklSyncEnabled());
-    const [isSyncing, setIsSyncing] = useState(false);
+    const [showLists, setShowLists] = useState(false);
+    // Chron now navigates via hash route
+    const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+    const [mdbAuthenticated, setMdbAuthenticated] = useState(false);
+
+    // Stats
+    const [stats, setStats] = useState({ 
+        movies: 0, 
+        shows: 0, 
+        hours: 0, 
+        topGenre: 'None' 
+    });
 
     useEffect(() => {
         getTrendingPeople().then(setPeople);
+        setMdbAuthenticated(mdblistService.isAuthenticated());
+        
+        // Calculate Stats
+        const calculateStats = async () => {
+            const watched = storageService.getListSync('watched');
+            const movies = watched.filter(i => i.media_type === 'movie').length;
+            const shows = watched.filter(i => i.media_type === 'tv').length;
+            
+            // Estimate Hours (Movies ~2h, Shows ~10h avg per entry if season/show, or ~1h if episode)
+            // Local items are usually Movies or Shows (not episodes). 
+            // We'll estimate: Movie = 2h, Show = 8h (conservative season avg)
+            const estimatedHours = (movies * 2) + (shows * 8);
+
+            // Top Genre
+            const genres = await getGenres('movie'); // Get movie genres for mapping
+            const tvGenres = await getGenres('tv');
+            const allGenres = [...genres, ...tvGenres];
+            
+            const genreCounts: Record<number, number> = {};
+            watched.forEach(item => {
+                if (item.genre_ids) {
+                    item.genre_ids.forEach(id => {
+                        genreCounts[id] = (genreCounts[id] || 0) + 1;
+                    });
+                }
+            });
+
+            let topGenreName = 'None';
+            let maxCount = 0;
+            
+            Object.entries(genreCounts).forEach(([id, count]) => {
+                if (count > maxCount) {
+                    maxCount = count;
+                    const genre = allGenres.find(g => g.id === Number(id));
+                    if (genre) topGenreName = genre.name;
+                }
+            });
+
+            setStats({ movies, shows, hours: estimatedHours, topGenre: topGenreName });
+        };
+        
+        calculateStats();
     }, []);
+
+    // Notify parent when lists view is toggled
+    useEffect(() => {
+        if (onListsToggle) {
+            onListsToggle(showLists || showReleaseNotes);
+        }
+    }, [showLists, showReleaseNotes, onListsToggle]);
 
     const getRegionName = (code: string) => regions.find(r => r.code === code)?.name || code;
 
-    return (
-        <div className="min-h-screen pt-12 px-6 pb-24 md:pl-32 md:pt-12 bg-[#050505]">
+  if (showLists) {
+    return <ListsPage 
+      onBack={() => {
+        setShowLists(false);
+      }}
+      onPersonClick={onPersonClick} 
+      // Only pass lists that are NOT rows (i.e., hubs or undefined viewType)
+      filter={(list: any) => list.viewType !== 'row'}
+    />;
+  }
 
-            {/* GuideAI Section - Only on Mobile */}
-            <div className="md:hidden max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Discovery Assistant</h2>
-                <GuideAIBot isMobileInline={true} />
+
+    // Chron is a dedicated page: navigate via hash '#/chron'
+
+    if (showReleaseNotes) {
+        return <ReleaseNotesPage onBack={() => setShowReleaseNotes(false)} />;
+    }
+
+    return (
+        <div className="min-h-[100dvh] pt-24 px-6 pb-24 md:pl-32 md:pt-24 bg-[#050505]">
+
+            {/* Subscriptions */}
+            {/* Removed per user request */}
+
+
+            {/* Features Section */}
+            <div className="max-w-2xl mx-auto mb-8 relative">
+                <h2 className="text-2xl font-bold text-white mb-6">Features</h2>
+                <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
+                    <button
+                        onClick={() => {
+                            window.location.hash = '#/chron';
+                        }}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
+                                <BrainCircuit size={20} />
+                            </div>
+                            <span className="text-white">Chron</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
+                    <button
+                        onClick={() => setShowLists(true)}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-purple-500/20 rounded-lg text-purple-400">
+                                <List size={20} />
+                            </div>
+                            <span className="text-white">Lists</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
+                    <button
+                        onClick={onCountdownClick}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-indigo-500/20 rounded-lg text-indigo-400">
+                                <Timer size={20} />
+                            </div>
+                            <span className="text-white">Release Countdown</span>
+                        </div>
+                        <ChevronRight size={16} className="text-gray-400" />
+                    </button>
+                </div>
             </div>
 
             {/* Cloud Sync Section */}
             <div className="max-w-2xl mx-auto mb-8 relative">
                 <h2 className="text-2xl font-bold text-white mb-6">Cloud Sync</h2>
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
+                    {/* Simkl Integration */}
                     {simklUser ? (
                         <>
                             <div className="flex items-center gap-4">
@@ -78,140 +205,97 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                                     Logout
                                 </button>
                             </div>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => simklService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
+                        >
+                            <span>Connect Simkl Account</span>
+                            <ChevronRight size={18} />
+                        </button>
+                    )}
 
-                            <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl">
-                                <div>
-                                    <p className="text-white font-medium">Automatic Cloud Sync</p>
-                                    <p className="text-gray-400 text-xs mt-1">
-                                        {simklSyncEnabled ? 'Changes sync automatically' : 'Sync manually when needed'}
-                                    </p>
+                    {/* Trakt Integration */}
+                    {traktUser ? (
+                        <>
+                            <div className="flex items-center gap-4 border-t border-white/10 pt-6">
+                                <img
+                                    src={traktUser.images?.avatar?.full || 'https://trakt.tv/assets/placeholders/default-user.png'}
+                                    alt={traktUser.name || traktUser.username}
+                                    className="w-12 h-12 rounded-full border-2 border-red-500"
+                                />
+                                <div className="flex-1">
+                                    <p className="text-white font-medium">{traktUser.name || traktUser.username}</p>
+                                    <p className="text-gray-400 text-sm">Connected to Trakt</p>
                                 </div>
                                 <button
                                     onClick={() => {
-                                        const newState = !simklSyncEnabled;
-                                        storageService.setSimklSyncEnabled(newState);
-                                        setSimklSyncEnabled(newState);
+                                        traktService.logout();
+                                        window.location.reload();
                                     }}
-                                    className={`relative w-14 h-8 rounded-full transition-colors ${simklSyncEnabled ? 'bg-indigo-600' : 'bg-gray-600'
-                                        }`}
+                                    className="px-4 py-2 bg-rose-600/20 border border-rose-500/30 rounded-xl hover:bg-rose-600/30 transition-all text-rose-400 text-sm font-medium"
                                 >
-                                    <div className={`absolute top-1 left-1 w-6 h-6 bg-white rounded-full transition-transform ${simklSyncEnabled ? 'translate-x-6' : 'translate-x-0'
-                                        }`} />
+                                    Logout
                                 </button>
                             </div>
-
-                            {storageService.getLastSimklSync() && (
-                                <p className="text-gray-500 text-xs text-center">
-                                    Last synced: {new Date(storageService.getLastSimklSync()!).toLocaleString()}
-                                </p>
-                            )}
-
-                            <button
-                                onClick={async () => {
-                                    setIsSyncing(true);
-                                    const wantToWatch = storageService.getList('wantToWatch');
-                                    const watched = storageService.getList('watched');
-                                    const result = await simklService.syncAllToSimkl(wantToWatch, watched);
-                                    setIsSyncing(false);
-                                    if (result.success) {
-                                        storageService.updateLastSimklSync();
-                                        alert(`Successfully synced ${result.synced} items to Simkl!`);
-                                    } else {
-                                        alert('Failed to sync some items. Please try again.');
-                                    }
-                                }}
-                                disabled={isSyncing}
-                                className="w-full flex items-center justify-center gap-2 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl transition-all text-white text-sm font-medium disabled:opacity-50"
-                            >
-                                {isSyncing ? (
-                                    <>
-                                        <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                                        <span>Syncing...</span>
-                                    </>
-                                ) : (
-                                    <span>Sync All Lists to Simkl</span>
-                                )}
-                            </button>
                         </>
                     ) : (
-                        <>
-                            <p className="text-gray-400 text-sm">
-                                Connect to Simkl for automatic cloud sync across all your devices.
-                            </p>
-                            <button
-                                onClick={() => simklService.initiateOAuth()}
-                                className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
-                            >
-                                <span>Connect Simkl Account</span>
-                                <ChevronRight size={18} />
-                            </button>
-                        </>
-                    )}
-                </div>
-            </div>
-
-            {/* Manual Sync Section */}
-            <div className="max-w-2xl mx-auto mb-8 relative">
-                <h2 className="text-2xl font-bold text-white mb-6">Manual Sync</h2>
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 space-y-6">
-                    <p className="text-gray-400 text-sm">
-                        Privacy first: Your watchlists are stored only on this device.
-                        To sync with another device, copy your sync code and paste it there.
-                    </p>
-
-                    <div className="flex flex-col gap-4">
                         <button
-                            onClick={async () => {
-                                const code = storageService.exportData();
-                                const success = await copyToClipboard(code);
-                                if (success) {
-                                    alert('Sync code copied to clipboard!');
-                                } else {
-                                    alert('Failed to copy. Please try again.');
-                                }
-                            }}
-                            className="w-full flex items-center justify-between p-4 bg-indigo-600/20 border border-indigo-500/30 rounded-xl hover:bg-indigo-600/30 transition-all text-indigo-400 font-medium"
+                            onClick={() => traktService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-red-600/20 border border-red-500/30 rounded-xl hover:bg-red-600/30 transition-all text-red-400 font-medium"
                         >
-                            <span>Copy Sync Code</span>
+                            <div className="flex items-center gap-3">
+                                <img src="https://cdn.brandfetch.io/id-7yyc2jm/w/193/h/193/theme/dark/icon.png?c=1dxbfHSJFAPEGdCLU4o5B" alt="Trakt" className="w-6 h-6 rounded-full" />
+                                <span>Connect Trakt Account</span>
+                            </div>
                             <ChevronRight size={18} />
                         </button>
+                    )}
 
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase tracking-widest pl-1">Import from another device</label>
-                            <div className="flex gap-2">
-                                <input
-                                    type="text"
-                                    placeholder="Paste sync code here..."
-                                    className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-indigo-500/50 transition-colors"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') {
-                                            const code = (e.currentTarget as HTMLInputElement).value;
-                                            if (storageService.importData(code)) {
-                                                alert('Data imported successfully! Refreshing...');
-                                                window.location.reload();
-                                            } else {
-                                                alert('Invalid sync code.');
-                                            }
-                                        }
-                                    }}
+                    {/* MDBList Integration */}
+                    {mdbAuthenticated ? (
+                        <>
+                            <div className="flex items-center gap-4 border-t border-white/10 pt-6">
+                                <img 
+                                    src="https://mdblist.com/static/mdblist_logo.png" 
+                                    alt="MDBList" 
+                                    className="w-12 h-12 rounded-full border-2 border-pink-500 bg-white" 
                                 />
+                                <div className="flex-1">
+                                    <p className="text-white font-medium">MDBList Connected</p>
+                                    <p className="text-gray-400 text-sm">Access to your MDBList lists</p>
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        localStorage.removeItem('mdblist_access_token');
+                                        localStorage.removeItem('mdblist_refresh_token');
+                                        setMdbAuthenticated(false);
+                                        window.location.reload();
+                                    }}
+                                    className="px-4 py-2 bg-rose-600/20 border border-rose-500/30 rounded-xl hover:bg-rose-600/30 transition-all text-rose-400 text-sm font-medium"
+                                >
+                                    Logout
+                                </button>
                             </div>
-                        </div>
-                    </div>
-                </div>
+                        </>
+                    ) : (
+                        <button
+                            onClick={() => mdblistService.initiateOAuth()}
+                            className="w-full flex items-center justify-between p-4 bg-pink-600/20 border border-pink-500/30 rounded-xl hover:bg-pink-600/30 transition-all text-pink-400 font-medium"
+                        >
+                            <div className="flex items-center gap-3">
+                                <img src="https://mdblist.com/static/mdblist_logo.png" alt="MDBList" className="w-6 h-6 rounded-full bg-white" />
+                                <span>Connect MDBList Account</span>
+                            </div>
+                            <ChevronRight size={18} />
+                        </button>
+                    )}
 
-                <button
-                    onClick={() => {
-                        if (confirm('Are you sure you want to delete all local watchlists? This cannot be undone.')) {
-                            localStorage.removeItem('watchguide_user_data');
-                            window.location.reload();
-                        }
-                    }}
-                    className="w-full flex items-center justify-between p-4 bg-rose-600/10 border border-rose-500/20 rounded-xl hover:bg-rose-600/20 transition-all text-rose-400 text-xs font-bold uppercase tracking-widest mt-4"
-                >
-                    <span>Reset All Local Data</span>
-                    <X size={14} />
-                </button>
+                    <p className="text-gray-400 text-sm text-center">
+                        Sync your watchlists across devices automatically using Simkl, Trakt, or MDBList.
+                    </p>
+                </div>
             </div>
 
             {/* Settings Section */}
@@ -231,13 +315,33 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <ChevronRight size={16} />
                         </div>
                     </div>
-                    <div className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors">
+                    <button
+                        onClick={() => setShowReleaseNotes(true)}
+                        className="w-full flex items-center justify-between p-4 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gray-500/20 rounded-lg text-gray-400"><Settings size={20} /></div>
-                            <span className="text-white">Preferences</span>
+                            <div className="p-2 bg-emerald-500/20 rounded-lg text-emerald-400">
+                                <Sparkles size={20} />
+                            </div>
+                            <span className="text-white">What's New</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-gray-400">
+                            <span className="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded-full border border-indigo-500/30">v2.0.1</span>
+                            <ChevronRight size={16} />
+                        </div>
+                    </button>
+                    <a
+                        href="/tos"
+                        className="flex items-center justify-between p-4 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-gray-500/20 rounded-lg text-gray-400">
+                                <Settings size={20} />
+                            </div>
+                            <span className="text-white">Terms of Service</span>
                         </div>
                         <ChevronRight size={16} className="text-gray-400" />
-                    </div>
+                    </a>
                 </div>
             </div>
 
@@ -283,8 +387,11 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
             )}
 
             {/* Trending People */}
-            <div className="max-w-4xl mx-auto">
-                <h2 className="text-2xl font-bold text-white mb-6">Trending People</h2>
+            <div className="max-w-4xl mx-auto mb-20 md:mb-0">
+                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
+                    <User className="text-indigo-400" size={20} />
+                    Trending People
+                </h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                     {people.map(person => (
                         <div
@@ -295,11 +402,11 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                             <img
                                 src={getImageUrl(person.profile_path, 'w500')}
                                 alt={person.name}
-                                className="w-12 h-12 rounded-full object-cover"
+                                className="w-12 h-12 rounded-full object-cover shrink-0"
                             />
-                            <div>
+                            <div className="min-w-0">
                                 <h4 className="text-sm font-semibold text-white line-clamp-1">{person.name}</h4>
-                                <span className="text-xs text-gray-400">{person.known_for_department}</span>
+                                <span className="text-xs text-gray-400 line-clamp-1">{person.known_for_department}</span>
                             </div>
                         </div>
                     ))}

@@ -8,6 +8,14 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        proxy: {
+          '/mdblist-api': {
+            target: 'https://api.mdblist.com',
+            changeOrigin: true,
+            rewrite: (path) => path.replace(/^\/mdblist-api/, ''),
+            secure: false,
+          }
+        }
       },
       plugins: [react()],
       define: {

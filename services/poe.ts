@@ -3,7 +3,7 @@ import { ChatMessage } from '../types';
 const API_KEY = '_Z3Mx1FKsVupSDjN7BSlQ5EJG2sqwlDQ2hzQMqpaiuw';
 const API_URL = 'https://api.poe.com/v1/chat/completions';
 
-export async function sendMessageToPoe(messages: ChatMessage[], context?: string): Promise<string> {
+export async function sendMessageToPoe(messages: ChatMessage[], context?: string, model?: string, webSearch: boolean = true): Promise<string> {
     // Basic mapping
     const openAIMessages = messages.map(msg => ({
         role: msg.role,
@@ -19,16 +19,10 @@ export async function sendMessageToPoe(messages: ChatMessage[], context?: string
     // We prepend it.
     const finalMessages = [systemInstruction, ...openAIMessages];
 
-    // Append --web_search true to the last USER message. 
-    // CRITICAL: It must be the VERY LAST thing in the content string for some specialized bots/parsers.
-    // We do NOT add extra text after it.
-    if (finalMessages.length > 0) {
+    if (webSearch && finalMessages.length > 0) {
         const lastMsg = finalMessages[finalMessages.length - 1];
-        if (lastMsg.role === 'user') {
-            // Ensure we don't double add if logic runs multiple times (though here it's per request)
-            if (!lastMsg.content.includes("--web_search true")) {
-                lastMsg.content = `${lastMsg.content} --web_search true`;
-            }
+        if (lastMsg.role === 'user' && !lastMsg.content.includes("--web_search true")) {
+            lastMsg.content = `${lastMsg.content} --web_search true`;
         }
     }
 
@@ -40,7 +34,7 @@ export async function sendMessageToPoe(messages: ChatMessage[], context?: string
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                model: 'gemini-3-flash',
+                model: model || 'gemini-2.5-flash-lite',
                 messages: finalMessages,
             })
         });

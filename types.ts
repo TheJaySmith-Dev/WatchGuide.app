@@ -1,15 +1,16 @@
 export interface MediaItem {
   id: number;
   title?: string;
-  name?: string; // For TV shows
+  name?: string;
+  overview: string;
   poster_path: string | null;
   backdrop_path: string | null;
-  overview: string;
-  media_type?: 'movie' | 'tv' | 'person';
+  media_type: 'movie' | 'tv' | 'person' | 'collection';
   vote_average?: number;
   release_date?: string;
   first_air_date?: string;
   genre_ids?: number[];
+  profile_path?: string | null;
   character?: string; // For cast credits
   job?: string; // For crew credits
 }
@@ -93,6 +94,33 @@ export interface CollectionDetail {
   parts: MediaItem[];
 }
 
+export interface Episode {
+  air_date: string;
+  episode_number: number;
+  id: number;
+  name: string;
+  overview: string;
+  production_code: string;
+  runtime: number | null;
+  season_number: number;
+  show_id: number;
+  still_path: string | null;
+  vote_average: number;
+  vote_count: number;
+}
+
+export interface Season {
+  air_date: string;
+  episode_count: number;
+  id: number;
+  name: string;
+  overview: string;
+  poster_path: string | null;
+  season_number: number;
+  vote_average: number;
+  episodes?: Episode[];
+}
+
 export interface MediaDetail extends MediaItem {
   credits?: Credits;
   runtime?: number;
@@ -110,9 +138,15 @@ export interface MediaDetail extends MediaItem {
   revenue?: number;
   budget?: number;
   belongs_to_collection?: Collection;
+  seasons?: Season[];
   similar?: { results: MediaItem[] };
   recommendations?: { results: MediaItem[] };
   homepage?: string;
+  ratings?: {
+    imdb?: string;
+    rottenTomatoes?: string;
+    metacritic?: string;
+  };
 }
 
 // Gemini AI Types
@@ -144,5 +178,94 @@ export interface SimklListItem {
     simkl?: number;
     tmdb?: number;
     imdb?: string;
+  };
+  type?: 'movie' | 'tv';
+}
+
+// Trakt Types
+export interface TraktUser {
+  username: string;
+  name: string;
+  ids: {
+    slug: string;
+  };
+  images?: {
+    avatar: {
+      full: string;
+    };
+  };
+}
+
+export interface TraktList {
+  name: string;
+  description: string;
+  privacy: 'public' | 'private' | 'friends';
+  share_link: string;
+  type: 'personal' | 'official' | 'watch_list' | 'favorites';
+  display_numbers: boolean;
+  allow_comments: boolean;
+  sort_by: string;
+  sort_how: string;
+  created_at: string;
+  updated_at: string;
+  item_count: number;
+  comment_count: number;
+  likes: number;
+  ids: {
+    trakt: number;
+    slug: string;
+  };
+  user: TraktUser;
+}
+
+export interface TraktListSearchResult {
+  type: string;
+  score: number;
+  list: TraktList;
+}
+
+export interface MDBListList {
+  id: number;
+  name: string;
+  slug: string;
+  description?: string;
+  items: number; // item_count equivalent
+  user_name: string;
+  url: string;
+}
+
+export interface CustomListConfig {
+    id: string; // Unique ID for the home screen entry
+    traktList?: TraktList | TraktList[]; // Can be a single list or multiple merged lists
+    mdblistList?: MDBListList | MDBListList[]; // MDBList integration
+    customName?: string;
+    viewType?: 'row' | 'hub'; // Defaults to 'hub' if undefined
+    showOnBrowse?: boolean; // Controls visibility on Browse page hubs/rows
+    thumbnailUrl?: string; // Optional custom thumbnail for hubs
+    items?: MediaItem[]; // Cached items
+    lastFetch?: number;
+}
+
+export interface TraktListItem {
+  type: 'movie' | 'show' | 'episode'; // Trakt uses 'show', Simkl 'tv'
+  movie?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tmdb: number;
+      imdb: string;
+    };
+  };
+  show?: {
+    title: string;
+    year: number;
+    ids: {
+      trakt: number;
+      slug: string;
+      tmdb: number;
+      imdb: string;
+    };
   };
 }

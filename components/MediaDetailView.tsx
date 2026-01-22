@@ -1,10 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { MediaItem, MediaDetail } from '../types';
-import { getMediaDetails, getImageUrl } from '../services/api';
+import { MediaItem, MediaDetail, Video, Person, CollectionDetail, Season, Episode, CustomListConfig } from '../types';
+import { getMediaDetails, getImageUrl, getPersonDetails, getFanArtLogo, getCollectionDetails, getSeasonDetails } from '../services/api';
+import { X, Play, Plus, Check, Heart, Share2, Star, Calendar, Clock, Globe, Users, ChevronRight, Tv, ListPlus, Layers } from 'lucide-react';
 import { storageService } from '../services/storage';
-import { copyToClipboard } from '../services/clipboard';
-import { X, Calendar, Star, Clock, Play, DollarSign, Users, Award, ExternalLink, Plus, Check, Heart } from 'lucide-react';
+import { mdblistService } from '../services/mdblist';
+import { traktService } from '../services/trakt';
 import ContentRow from './ContentRow';
+import SeasonView from './SeasonView';
+import AddListModal from './AddListModal';
 
 interface MediaDetailViewProps {
     item: MediaItem;
@@ -18,29 +21,65 @@ interface MediaDetailViewProps {
 const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose, onItemClick, onPersonClick, onCollectionClick }) => {
     const [details, setDetails] = useState<MediaDetail | null>(null);
     const [loading, setLoading] = useState(true);
-    const [isWantToWatch, setIsWantToWatch] = useState(storageService.isInList('wantToWatch', item.id));
+    const [isPlanToWatch, setIsPlanToWatch] = useState(storageService.isInList('planToWatch', item.id));
     const [isWatched, setIsWatched] = useState(storageService.isInList('watched', item.id));
     const [isLiked, setIsLiked] = useState(storageService.isInList('liked', item.id));
     const [showSyncPrompt, setShowSyncPrompt] = useState(false);
+
+    const [logoUrl, setLogoUrl] = useState<string | null>(null);
+    const [collectionParts, setCollectionParts] = useState<MediaItem[]>([]);
+    const [showAddPanel, setShowAddPanel] = useState(false);
+    const [showCreateListModal, setShowCreateListModal] = useState(false);
+    const [customLists, setCustomLists] = useState<CustomListConfig[]>([]);
+    
+    // Season View State
+    const [selectedSeason, setSelectedSeason] = useState<Season | null>(null);
+    const [seasonEpisodes, setSeasonEpisodes] = useState<Episode[]>([]);
 
     // When item changes, reset details and fetch new ones
     useEffect(() => {
         setLoading(true);
         setDetails(null);
-        setIsWantToWatch(storageService.isInList('wantToWatch', item.id));
+        setLogoUrl(null);
+        setCollectionParts([]);
+        setSelectedSeason(null);
+        setSeasonEpisodes([]);
+        setIsPlanToWatch(storageService.isInList('planToWatch', item.id));
         setIsWatched(storageService.isInList('watched', item.id));
         setIsLiked(storageService.isInList('liked', item.id));
 
-        getMediaDetails(item.media_type as 'movie' | 'tv' || 'movie', item.id)
-            .then((data) => {
-                setDetails(data);
-                setLoading(false);
-            })
-            .catch((err) => {
-                console.error(err);
-                setLoading(false);
-            });
+        const type = item.media_type as 'movie' | 'tv' || 'movie';
+
+        // Parallel fetch for details and logo
+        Promise.all([
+            getMediaDetails(type, item.id),
+            getFanArtLogo(type, item.id)
+        ]).then(([data, logo]) => {
+            setDetails(data);
+            setLogoUrl(logo);
+            setLoading(false);
+            
+            // If part of a collection, fetch the full collection details to get the parts
+            if (data.belongs_to_collection) {
+                getCollectionDetails(data.belongs_to_collection.id).then(col => {
+                    if (col && col.parts) {
+                        // Sort by release date
+                        const sorted = col.parts
+                            .filter(p => p.release_date)
+                            .sort((a, b) => new Date(a.release_date!).getTime() - new Date(b.release_date!).getTime());
+                        setCollectionParts(sorted);
+                    }
+                });
+            }
+        }).catch((err) => {
+            console.error(err);
+            setLoading(false);
+        });
     }, [item]);
+
+    useEffect(() => {
+        setCustomLists(storageService.getCustomLists());
+    }, []);
 
     // Use loaded details or fallback to basic item info
     const displayItem = details || item;
@@ -48,9 +87,30 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
     // Extract Data
     const trailer = details?.videos?.results?.find(v => v.type === 'Trailer' && v.site === 'YouTube');
 
-    // Region Logic: Mirror UK (GB) content for South Africa (ZA) if requested, otherwise use selected region
-    const providerRegionKey = region === 'ZA' ? 'GB' : region;
-    const providers = details?.['watch/providers']?.results?.[providerRegionKey];
+    // Region Logic: Handle ZA specifically to mix local availability with UK's Disney+
+    let providers = details?.['watch/providers']?.results?.[region];
+    
+    // Special case for South Africa (ZA): Use local data but pull Disney+ from UK (GB)
+    if (region === 'ZA') {
+        const zaProviders = details?.['watch/providers']?.results?.['ZA'];
+        const gbProviders = details?.['watch/providers']?.results?.['GB'];
+        
+        // Start with ZA providers
+        providers = zaProviders || { link: '', flatrate: [], rent: [], buy: [] };
+        
+        // Check if Disney+ is in GB providers
+        const disneyPlusGB = gbProviders?.flatrate?.find(p => p.provider_name.includes('Disney'));
+        
+        if (disneyPlusGB) {
+            // Initialize flatrate if it doesn't exist
+            if (!providers.flatrate) providers.flatrate = [];
+            
+            // Add Disney+ if not already present
+            if (!providers.flatrate.some(p => p.provider_name.includes('Disney'))) {
+                providers.flatrate = [...providers.flatrate, disneyPlusGB];
+            }
+        }
+    }
 
     const flatrate = providers?.flatrate || [];
     const rent = providers?.rent || [];
@@ -67,7 +127,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumSignificantDigits: 3 }).format(value);
     };
 
-    const handleToggleList = (type: 'wantToWatch' | 'watched' | 'liked') => {
+    const handleToggleList = async (type: 'planToWatch' | 'watched' | 'liked') => {
         const itemToStore = {
             id: item.id,
             title: item.title,
@@ -81,9 +141,9 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
             first_air_date: item.first_air_date
         };
 
-        const newState = storageService.toggleItem(type, itemToStore);
+        const newState = await storageService.toggleItem(type, itemToStore);
 
-        if (type === 'wantToWatch') setIsWantToWatch(newState);
+        if (type === 'planToWatch') setIsPlanToWatch(newState);
         if (type === 'watched') setIsWatched(newState);
         if (type === 'liked') setIsLiked(newState);
 
@@ -92,31 +152,49 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
         setTimeout(() => setShowSyncPrompt(false), 3000);
     };
 
+    const handleSeasonClick = async (season: Season) => {
+        if (!details) return;
+        
+        // Fetch episodes
+        try {
+            const data = await getSeasonDetails(details.id, season.season_number);
+            if (data && data.episodes) {
+                setSeasonEpisodes(data.episodes);
+                setSelectedSeason(season);
+            }
+        } catch (error) {
+            console.error('Failed to fetch season details', error);
+        }
+    };
+
     return (
         <div className="fixed inset-0 z-[100] bg-black/50 backdrop-blur-sm animate-fade-in flex items-center justify-center p-0 md:p-8 overflow-hidden">
+            {selectedSeason && (
+                <SeasonView 
+                    season={selectedSeason} 
+                    episodes={seasonEpisodes} 
+                    onClose={() => setSelectedSeason(null)} 
+                />
+            )}
+
+            {showCreateListModal && (
+                <AddListModal
+                    onClose={() => setShowCreateListModal(false)}
+                    onAdded={() => {
+                        setCustomLists(storageService.getCustomLists());
+                        setShowCreateListModal(false);
+                    }}
+                    mode="create"
+                    initialProvider="create"
+                />
+            )}
+
             {showSyncPrompt && (
                 <div className="absolute top-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-indigo-600 text-white rounded-full shadow-2xl z-[110] animate-bounce text-sm font-bold flex items-center gap-3 ring-2 ring-white/20">
                     <div className="flex items-center gap-2">
                         <Check size={16} />
-                        <span>Updated!</span>
+                        <span>Synced to Simkl!</span>
                     </div>
-                    <div className="w-px h-4 bg-white/20" />
-                    <button
-                        onClick={async (e) => {
-                            e.stopPropagation();
-                            const code = storageService.exportData();
-                            const success = await copyToClipboard(code);
-                            if (success) {
-                                alert('Sync Code copied!');
-                            } else {
-                                alert('Failed to copy.');
-                            }
-                        }}
-                        className="hover:text-indigo-200 transition-colors flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full hover:bg-white/20"
-                    >
-                        <Plus size={14} className="rotate-45" />
-                        Copy Sync Code
-                    </button>
                 </div>
             )}
 
@@ -141,20 +219,35 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                     </div>
 
                     <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 flex flex-col md:flex-row items-end gap-8">
-                        {/* Poster */}
-                        <div className="hidden md:block w-48 rounded-xl overflow-hidden shadow-2xl border border-white/10 shrink-0 transform translate-y-16">
-                            <img src={getImageUrl(displayItem.poster_path)} className="w-full h-auto" alt="Poster" />
-                        </div>
-
                         <div className="flex-1 mb-4 md:mb-0">
-                            <h1 className="text-4xl md:text-6xl font-black text-white mb-2 leading-tight drop-shadow-xl">
-                                {displayItem.title || displayItem.name}
-                            </h1>
+                            {logoUrl ? (
+                                <img 
+                                    src={logoUrl} 
+                                    alt={displayItem.title || displayItem.name} 
+                                    className="max-h-12 md:max-h-20 w-auto object-contain mb-4 drop-shadow-lg"
+                                />
+                            ) : (
+                                <h1 className="text-3xl md:text-5xl font-black text-white mb-2 leading-tight drop-shadow-xl max-w-2xl">
+                                    {displayItem.title || displayItem.name}
+                                </h1>
+                            )}
                             {details?.tagline && (
                                 <p className="text-lg md:text-xl text-indigo-300 font-medium italic mb-4 drop-shadow-md">"{details.tagline}"</p>
                             )}
 
                             <div className="flex flex-wrap items-center gap-4 text-sm md:text-base text-gray-300">
+                                {details?.ratings?.rottenTomatoes && (
+                                    <div className="flex items-center gap-1.5 bg-[#FA320A]/10 text-[#FA320A] px-2 py-1 rounded font-bold border border-[#FA320A]/20">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/5/5b/Rotten_Tomatoes.svg" className="w-4 h-4" alt="RT" />
+                                        <span>{details.ratings.rottenTomatoes}</span>
+                                    </div>
+                                )}
+                                {details?.ratings?.imdb && (
+                                    <div className="flex items-center gap-1.5 bg-[#F5C518]/10 text-[#F5C518] px-2 py-1 rounded font-bold border border-[#F5C518]/20">
+                                        <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/5/57/IMDb_Logo_Rectangle.svg/640px-IMDb_Logo_Rectangle.svg.png" className="w-8 h-auto object-contain" alt="IMDb" />
+                                        <span>{details.ratings.imdb}</span>
+                                    </div>
+                                )}
                                 {displayItem.vote_average && (
                                     <div className="flex items-center gap-1 text-green-400 font-bold bg-green-400/10 px-2 py-1 rounded">
                                         <Star size={16} fill="currentColor" />
@@ -175,48 +268,183 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                         </div>
 
                         <div className="flex flex-col md:flex-row items-center gap-4 mt-2">
-                            {trailer && (
-                                <a href="#trailer" className="flex items-center gap-3 bg-white text-black px-6 py-4 rounded-full font-bold hover:scale-105 transition-transform shadow-lg shadow-white/10">
-                                    <Play size={20} fill="currentColor" />
-                                    Watch Trailer
-                                </a>
-                            )}
-
-                            <div className="flex items-center gap-2">
-                                <button
-                                    onClick={() => handleToggleList('wantToWatch')}
-                                    title="Want to Watch"
-                                    className={`p-4 rounded-full border transition-all ${isWantToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Plus size={20} className={isWantToWatch ? 'rotate-45 transition-transform' : ''} />
-                                </button>
-                                <button
-                                    onClick={() => handleToggleList('watched')}
-                                    title="Watched"
-                                    className={`p-4 rounded-full border transition-all ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Check size={20} />
-                                </button>
-                                <button
-                                    onClick={() => handleToggleList('liked')}
-                                    title="Like"
-                                    className={`p-4 rounded-full border transition-all ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/10 border-white/20 text-white hover:bg-white/20'}`}
-                                >
-                                    <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
-                                </button>
-                            </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Content Body */}
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 p-6 md:p-12 md:mt-8 bg-gradient-to-b from-black/80 to-black/95">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-8 p-6 md:p-12 bg-gradient-to-b from-black/80 to-black/95">
 
                     {/* Left Sidebar */}
                     <div className="md:col-span-3 space-y-8">
                         {/* Mobile Poster only */}
                         <div className="md:hidden w-32 rounded-lg overflow-hidden shadow-lg mb-6">
                             <img src={getImageUrl(displayItem.poster_path)} className="w-full h-auto" alt="Poster" />
+                        </div>
+
+                        {/* Add to List Panel */}
+                        <div className="relative">
+                            <button
+                                onClick={() => setShowAddPanel(v => !v)}
+                                title="Add to List"
+                                className="w-full p-3 rounded-xl border transition-all flex items-center justify-center bg-white/10 border-white/20 text-white hover:bg-white/20 gap-2"
+                            >
+                                <ListPlus size={20} />
+                                <span className="font-medium">Add to List</span>
+                            </button>
+
+                            {showAddPanel && (
+                                <div className="absolute z-50 mt-2 w-full bg-[#121212] border border-white/10 rounded-2xl shadow-2xl p-3">
+                                    <div className="mb-3">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-gray-400 mb-2">Quick Actions</div>
+                                        <div className="grid grid-cols-3 gap-2">
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('planToWatch');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isPlanToWatch ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Plus size={16} className={isPlanToWatch ? 'rotate-45 transition-transform' : ''} />
+                                                <span>Watchlist</span>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('watched');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isWatched ? 'bg-green-600 border-green-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Check size={16} />
+                                                <span>Watched</span>
+                                            </button>
+                                            <button
+                                                onClick={async () => {
+                                                    await handleToggleList('liked');
+                                                }}
+                                                className={`p-2 rounded-lg text-sm font-medium border transition-all flex items-center justify-center gap-2 ${isLiked ? 'bg-rose-600 border-rose-500 text-white' : 'bg-white/5 border-white/10 text-white hover:bg-white/10'}`}
+                                            >
+                                                <Heart size={16} fill={isLiked ? "currentColor" : "none"} />
+                                                <span>Liked</span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <div className="mb-2 flex items-center justify-between">
+                                        <div className="text-xs font-bold uppercase tracking-widest text-gray-400">Your Lists</div>
+                                        <button
+                                            onClick={() => setShowCreateListModal(true)}
+                                            className="text-xs px-2 py-1 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors border border-indigo-500/30 flex items-center gap-1"
+                                        >
+                                            <Plus size={14} />
+                                            New List
+                                        </button>
+                                    </div>
+
+                                    <div className="max-h-64 overflow-y-auto pr-1">
+                                        {customLists.length === 0 ? (
+                                            <p className="text-gray-400 text-sm">No lists yet. Create a new list.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {customLists.map((cl) => {
+                                                    const traktLists = cl.traktList ? (Array.isArray(cl.traktList) ? cl.traktList : [cl.traktList]) : [];
+                                                    const mdbLists = cl.mdblistList ? (Array.isArray(cl.mdblistList) ? cl.mdblistList : [cl.mdblistList]) : [];
+                                                    const hasMultiple = traktLists.length + mdbLists.length > 1;
+                                                    return (
+                                                        <div key={cl.id} className="bg-white/5 border border-white/10 rounded-xl p-2">
+                                                            <div className="flex items-center justify-between">
+                                                                <div className="flex items-center gap-2">
+                                                                    <Layers size={16} className="text-gray-400" />
+                                                                    <span className="text-sm text-white font-medium">{cl.customName}</span>
+                                                                </div>
+                                                                {!hasMultiple && (
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            const itemToStore = {
+                                                                                id: item.id,
+                                                                                title: item.title,
+                                                                                name: item.name,
+                                                                                poster_path: item.poster_path,
+                                                                                backdrop_path: item.backdrop_path,
+                                                                                overview: item.overview,
+                                                                                media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                vote_average: item.vote_average,
+                                                                                release_date: item.release_date,
+                                                                                first_air_date: item.first_air_date
+                                                                            };
+                                                                            if (mdbLists.length === 1) {
+                                                                                await mdblistService.addItemToList(mdbLists[0].id, itemToStore as any);
+                                                                            } else if (traktLists.length === 1) {
+                                                                                const slug = traktLists[0].ids.slug;
+                                                                                await traktService.addItemToPersonalList(slug, itemToStore as any);
+                                                                            } else {
+                                                                                storageService.addItemToLocalCustomList(cl.id, itemToStore as any);
+                                                                            }
+                                                                        }}
+                                                                        className="text-xs px-2 py-1 rounded-lg bg-indigo-600/20 text-indigo-400 hover:bg-indigo-600/30 transition-colors border border-indigo-500/30"
+                                                                    >
+                                                                        Add
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                            {hasMultiple && (
+                                                                <div className="mt-2 grid grid-cols-1 gap-1">
+                                                                    {mdbLists.map(m => (
+                                                                        <button
+                                                                            key={`mdb-${m.id}`}
+                                                                            onClick={async () => {
+                                                                                const itemToStore = {
+                                                                                    id: item.id,
+                                                                                    title: item.title,
+                                                                                    name: item.name,
+                                                                                    poster_path: item.poster_path,
+                                                                                    backdrop_path: item.backdrop_path,
+                                                                                    overview: item.overview,
+                                                                                    media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                    vote_average: item.vote_average,
+                                                                                    release_date: item.release_date,
+                                                                                    first_air_date: item.first_air_date
+                                                                                };
+                                                                                await mdblistService.addItemToList(m.id, itemToStore as any);
+                                                                            }}
+                                                                            className="w-full text-left text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 flex items-center justify-between"
+                                                                        >
+                                                                            <span>MDBList: {m.name}</span>
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    ))}
+                                                                    {traktLists.map(t => (
+                                                                        <button
+                                                                            key={`trakt-${t.ids.slug}`}
+                                                                            onClick={async () => {
+                                                                                const itemToStore = {
+                                                                                    id: item.id,
+                                                                                    title: item.title,
+                                                                                    name: item.name,
+                                                                                    poster_path: item.poster_path,
+                                                                                    backdrop_path: item.backdrop_path,
+                                                                                    overview: item.overview,
+                                                                                    media_type: item.media_type || (details?.title ? 'movie' : 'tv'),
+                                                                                    vote_average: item.vote_average,
+                                                                                    release_date: item.release_date,
+                                                                                    first_air_date: item.first_air_date
+                                                                                };
+                                                                                await traktService.addItemToPersonalList(t.ids.slug, itemToStore as any);
+                                                                            }}
+                                                                            className="w-full text-left text-xs px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-white border border-white/10 flex items-center justify-between"
+                                                                        >
+                                                                            <span>Trakt: {t.name}</span>
+                                                                            <Plus size={14} />
+                                                                        </button>
+                                                                    ))}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
                         </div>
 
                         {/* Streaming Info */}
@@ -311,23 +539,89 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                             </p>
                         </section>
 
+                        {/* Seasons (TV Only) */}
+                        {details?.seasons && details.seasons.length > 0 && (
+                            <section>
+                                <h3 className="text-2xl font-bold text-white mb-6 flex items-center gap-3">
+                                    <Tv size={24} className="text-indigo-400" />
+                                    Seasons & Episodes
+                                </h3>
+                                <div className="flex gap-4 overflow-x-auto pb-4 hide-scrollbar snap-x">
+                                    {details.seasons.map(season => (
+                                        <div 
+                                            key={season.id} 
+                                            onClick={() => handleSeasonClick(season)}
+                                            className="snap-start shrink-0 w-40 bg-white/5 border border-white/10 rounded-xl overflow-hidden group hover:border-indigo-500 transition-colors cursor-pointer"
+                                        >
+                                            <div className="aspect-[2/3] relative">
+                                                <img 
+                                                    src={getImageUrl(season.poster_path)} 
+                                                    alt={season.name}
+                                                    className="w-full h-full object-cover"
+                                                />
+                                                <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-bold text-white border border-white/10">
+                                                    {season.episode_count} Eps
+                                                </div>
+                                            </div>
+                                            <div className="p-3">
+                                                <h4 className="text-white font-bold text-sm truncate">{season.name}</h4>
+                                                <p className="text-gray-500 text-xs">{season.air_date?.split('-')[0]}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
+
                         {/* Collection / Franchise */}
                         {details?.belongs_to_collection && (
-                            <div
-                                onClick={() => onCollectionClick(details.belongs_to_collection!.id)}
-                                className="relative h-48 rounded-2xl overflow-hidden group cursor-pointer border border-white/10"
-                            >
-                                <img
-                                    src={getImageUrl(details.belongs_to_collection.backdrop_path, 'original')}
-                                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                                    alt={details.belongs_to_collection.name}
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-r from-black/80 to-transparent flex flex-col justify-center px-8">
-                                    <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2">Collection</span>
-                                    <h3 className="text-3xl font-bold text-white">{details.belongs_to_collection.name}</h3>
-                                    <div className="flex items-center gap-2 mt-4 text-white font-bold text-sm">
-                                        <span>View Franchise</span>
-                                        <Play size={12} className="ml-1" />
+                            <div className="space-y-4">
+                                <div
+                                    onClick={() => onCollectionClick(details.belongs_to_collection!.id)}
+                                    className="relative h-64 md:h-80 rounded-2xl overflow-hidden group cursor-pointer border border-white/10"
+                                >
+                                    <img
+                                        src={getImageUrl(details.belongs_to_collection.backdrop_path, 'original')}
+                                        className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105 opacity-60"
+                                        alt={details.belongs_to_collection.name}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent flex flex-col justify-end p-6 md:p-8">
+                                        <div className="mb-6">
+                                            <span className="text-indigo-400 text-xs font-bold uppercase tracking-wider mb-2 block">Collection</span>
+                                            <h3 className="text-3xl font-bold text-white mb-2">{details.belongs_to_collection.name}</h3>
+                                            <div className="flex items-center gap-2 text-white/80 font-bold text-sm hover:text-white transition-colors">
+                                                <span>View Full Franchise</span>
+                                                <ChevronRight size={16} />
+                                            </div>
+                                        </div>
+
+                                        {/* Inline Collection Parts */}
+                                        {collectionParts.length > 0 && (
+                                            <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar snap-x" onClick={(e) => e.stopPropagation()}>
+                                                {collectionParts.map(part => (
+                                                    <div 
+                                                        key={part.id}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            onItemClick({ ...part, media_type: 'movie' });
+                                                        }}
+                                                        className="snap-start shrink-0 w-24 md:w-28 aspect-[2/3] rounded-lg overflow-hidden border border-white/20 hover:border-indigo-500 transition-all hover:scale-105 shadow-lg relative group/part"
+                                                        title={part.title}
+                                                    >
+                                                        <img 
+                                                            src={getImageUrl(part.poster_path)} 
+                                                            className="w-full h-full object-cover" 
+                                                            alt={part.title}
+                                                        />
+                                                        {part.id === item.id && (
+                                                            <div className="absolute inset-0 bg-indigo-600/40 border-2 border-indigo-500 flex items-center justify-center">
+                                                                <span className="text-[10px] font-bold bg-indigo-600 text-white px-1.5 py-0.5 rounded">NOW</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             </div>
@@ -363,18 +657,21 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
                                     {cast.map(person => (
                                         <div
                                             key={person.id}
-                                            className="snap-start shrink-0 w-32 group cursor-pointer"
-                                            onClick={() => onPersonClick(person.id)}
+                                            className="snap-start shrink-0 w-32 group cursor-pointer relative z-10"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onPersonClick(person.id);
+                                            }}
                                         >
-                                            <div className="w-32 h-32 rounded-full overflow-hidden mb-3 border-2 border-white/10 group-hover:border-indigo-500 transition-colors">
+                                            <div className="w-32 h-32 rounded-full overflow-hidden mb-3 border-2 border-white/10 group-hover:border-indigo-500 transition-colors pointer-events-none">
                                                 <img
-                                                    src={getImageUrl(person.profile_path, 'w500')}
+                                                    src={getImageUrl(person.profile_path, 'w185')}
                                                     alt={person.name}
                                                     className="w-full h-full object-cover"
                                                 />
                                             </div>
-                                            <h4 className="text-white font-medium text-sm text-center truncate group-hover:text-indigo-400 transition-colors">{person.name}</h4>
-                                            <p className="text-gray-500 text-xs text-center truncate">{person.character}</p>
+                                            <h4 className="text-white font-medium text-sm text-center truncate group-hover:text-indigo-400 transition-colors pointer-events-none">{person.name}</h4>
+                                            <p className="text-gray-500 text-xs text-center truncate pointer-events-none">{person.character}</p>
                                         </div>
                                     ))}
                                 </div>
@@ -400,3 +697,7 @@ const MediaDetailView: React.FC<MediaDetailViewProps> = ({ item, region, onClose
 };
 
 export default MediaDetailView;
+ 
+// Inline modal rendering to create a new custom list
+// Placed outside default export to avoid cluttering main JSX; handled within component state above
+// Note: The component already conditionally sets showCreateListModal; render it near root when true

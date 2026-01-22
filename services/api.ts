@@ -1,6 +1,7 @@
 import { MediaItem, MediaDetail, Person, CollectionDetail } from '../types';
 
 const TMDB_API_KEY = '09b97a49759876f2fde9eadb163edc44';
+const OMDB_API_KEY = 'c60b7091';
 const BASE_URL = 'https://api.themoviedb.org/3';
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p';
 
@@ -50,17 +51,24 @@ const FALLBACK_DATA: MediaItem[] = [
 
 // --- Image Helpers ---
 
-export const getImageUrl = (path: string | null, size: 'w500' | 'original' = 'w500') => {
-  if (!path) return 'https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&fit=crop&w=500&q=80';
+export const getImageUrl = (path: string | null, size: 'w500' | 'original' | 'w185' | 'w1280' = 'w500') => {
+  if (!path) return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAwAAAAQACAYAAAAzOeKqAAAAAklEQVR4nO3BMQEAAADCoPVPbQhPoAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADwQwQzAAEugzCqAAAAAElFTkSuQmCC';
+  if (path.startsWith('http')) return path; // Return full URLs as is
+  if (path.startsWith('data:image')) return path; // Return data URIs as is (for user uploads)
+  
+  // Fix for 'original' being used as size when it might be expected to be a path part in some legacy calls
+  // but here we just construct the TMDB URL.
+  // NOTE: If size is 'w1280' but TMDB doesn't support it for poster (only backdrop), it might fail.
+  // Posters usually support: w92, w154, w185, w342, w500, w780, original
+  // Backdrops usually support: w300, w780, w1280, original
+  
   return `${IMAGE_BASE_URL}/${size}${path}`;
 };
 
 // --- FanArt Integration ---
 export const getFanArtLogo = async (type: 'movie' | 'tv', tmdbId: number): Promise<string | null> => {
   try {
-    const response = await fetch(`${BASE_URL}/${type}/${tmdbId}/images?api_key=${TMDB_API_KEY}&include_image_language=en,null`);
-    if (!response.ok) return null;
-    const data = await response.json();
+    const data = await fetchTMDB<any>(`/${type}/${tmdbId}/images`, { include_image_language: 'en,null' });
     const logo = data.logos?.find((l: any) => l.iso_639_1 === 'en') || data.logos?.[0];
     return logo ? `${IMAGE_BASE_URL}/original${logo.file_path}` : null;
   } catch (e) {
@@ -94,9 +102,12 @@ export const getTrending = async (): Promise<MediaItem[]> => {
   }
 };
 
-export const getMovies = async (category: 'popular' | 'top_rated' | 'upcoming' | 'now_playing'): Promise<MediaItem[]> => {
+export const getMovies = async (category: 'popular' | 'top_rated' | 'upcoming' | 'now_playing', region?: string): Promise<MediaItem[]> => {
   try {
-    const data = await fetchTMDB<{ results: MediaItem[] }>(`/movie/${category}`);
+    const params: Record<string, string> = {};
+    if (region) params.region = region;
+    
+    const data = await fetchTMDB<{ results: MediaItem[] }>(`/movie/${category}`, params);
     const results = (data.results || []).map(item => ({ ...item, media_type: 'movie' as const }));
     return results.length > 0 ? results : FALLBACK_DATA.filter(i => i.media_type === 'movie');
   } catch (e) {
@@ -132,13 +143,42 @@ export const searchPeople = async (query: string): Promise<Person[]> => {
 
 export const getMediaDetails = async (type: 'movie' | 'tv', id: number): Promise<MediaDetail> => {
   try {
-    return await fetchTMDB<MediaDetail>(`/${type}/${id}`, {
+    const details = await fetchTMDB<MediaDetail>(`/${type}/${id}`, {
       append_to_response: 'credits,external_ids,images,videos,similar,recommendations,watch/providers'
     });
+
+    // Fetch OMDB Ratings if IMDB ID exists
+    if (details.external_ids?.imdb_id) {
+        try {
+            const omdbRes = await fetch(`https://www.omdbapi.com/?apikey=${OMDB_API_KEY}&i=${details.external_ids.imdb_id}`);
+            const omdbData = await omdbRes.json();
+            
+            if (omdbData.Response === 'True') {
+                details.ratings = {
+                    imdb: omdbData.imdbRating,
+                    rottenTomatoes: omdbData.Ratings?.find((r: any) => r.Source === 'Rotten Tomatoes')?.Value,
+                    metacritic: omdbData.Metascore !== 'N/A' ? omdbData.Metascore : undefined
+                };
+            }
+        } catch (e) {
+            console.warn('Failed to fetch OMDB ratings', e);
+        }
+    }
+
+    return details;
   } catch {
     // Return basic dummy detail if fetch fails
     const fallback = FALLBACK_DATA.find(i => i.id === id);
     return (fallback || FALLBACK_DATA[0]) as MediaDetail;
+  }
+};
+
+export const getMediaBasic = async (type: 'movie' | 'tv', id: number): Promise<MediaItem | null> => {
+  try {
+    const data = await fetchTMDB<MediaItem>(`/${type}/${id}`);
+    return { ...data, media_type: type };
+  } catch {
+    return null;
   }
 };
 
@@ -164,9 +204,88 @@ export const getRecommendations = async (type: 'movie' | 'tv', id: number): Prom
   } catch { return []; }
 };
 
+export const getVideos = async (type: 'movie' | 'tv', id: number): Promise<any[]> => {
+  try {
+    const data = await fetchTMDB<{ results: any[] }>(`/${type}/${id}/videos`);
+    return data.results || [];
+  } catch { return []; }
+};
+
 export const getSimilarMedia = async (type: 'movie' | 'tv', id: number): Promise<MediaItem[]> => {
   try {
     const data = await fetchTMDB<{ results: MediaItem[] }>(`/${type}/${id}/similar`);
     return (data.results || []).map(item => ({ ...item, media_type: type }));
   } catch { return []; }
+};
+
+export const getGenres = async (type: 'movie' | 'tv'): Promise<{ id: number; name: string }[]> => {
+  try {
+    const data = await fetchTMDB<{ genres: { id: number; name: string }[] }>(`/genre/${type}/list`);
+    return data.genres || [];
+  } catch { return []; }
+};
+
+export const discoverMedia = async (
+  type: 'movie' | 'tv', 
+  filters: { 
+    genre?: number; 
+    year?: number; 
+    sortBy?: string;
+  }
+): Promise<MediaItem[]> => {
+  try {
+    const params: Record<string, string> = {};
+    if (filters.genre) params.with_genres = filters.genre.toString();
+    
+    if (filters.year) {
+        if (type === 'movie') {
+            params.primary_release_year = filters.year.toString();
+        } else {
+            params.first_air_date_year = filters.year.toString();
+        }
+    }
+    
+    if (filters.sortBy) params.sort_by = filters.sortBy;
+
+    const data = await fetchTMDB<{ results: MediaItem[] }>(`/discover/${type}`, params);
+    return (data.results || []).map(item => ({ ...item, media_type: type }));
+  } catch (e) {
+    console.error('Discover failed', e);
+    return [];
+  }
+};
+
+export const getFeaturedCollections = async (): Promise<CollectionDetail[]> => {
+    // Curated list of popular collection IDs
+    const collectionIds = [
+        86311, // Avengers
+        10, // Star Wars
+        1241, // Harry Potter
+        2344, // The Matrix
+        638, // James Bond
+        9485, // Fast and Furious
+        87359, // Mission Impossible
+        131292 // Iron Man
+    ];
+
+    try {
+        // Fetch details for these collections
+        const promises = collectionIds.map(async (id) => {
+            try {
+                return await fetchTMDB<CollectionDetail>(`/collection/${id}`);
+            } catch {
+                return null;
+            }
+        });
+
+        const results = await Promise.all(promises);
+        return results.filter(Boolean) as CollectionDetail[];
+    } catch (e) {
+        console.error('Failed to fetch featured collections', e);
+        return [];
+    }
+};
+
+export const getSeasonDetails = async (tvId: number, seasonNumber: number): Promise<any> => {
+    return fetchTMDB<any>(`/tv/${tvId}/season/${seasonNumber}`);
 };

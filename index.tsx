@@ -1,7 +1,8 @@
-import React, { Component, ReactNode } from 'react';
+import React, { Component, ReactNode, useEffect, useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
+import TermsOfService from './pages/TermsOfService';
 
 
 interface ErrorBoundaryProps {
@@ -54,11 +55,31 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+const Router: React.FC = () => {
+  const [path, setPath] = useState(window.location.pathname || '/');
+
+  useEffect(() => {
+    const onPopState = () => setPath(window.location.pathname || '/');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  switch (path) {
+    case '/pricing':
+      return <Pricing />;
+    case '/tos':
+    case '/terms':
+      return <TermsOfService />;
+    default:
+      return <App />;
+  }
+};
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <Router />
     </ErrorBoundary>
   </React.StrictMode>
 );
