@@ -1,5 +1,4 @@
 import React from 'react';
-import LiquidGlass from 'liquid-glass-react';
 import { ArrowLeft, Rocket, Zap, Layout, Sparkles, BrainCircuit } from 'lucide-react';
 
 interface Release {
@@ -159,22 +158,10 @@ const ReleaseNotesPage: React.FC<ReleaseNotesPageProps> = ({ onBack }) => {
                 {/* Timeline */}
                 <div className="space-y-12 relative before:absolute before:left-8 md:before:left-1/2 before:top-0 before:bottom-0 before:w-px before:bg-white/10 before:-translate-x-1/2">
                     <div className="mb-8 flex justify-center">
-                        <LiquidGlass
-                            displacementScale={64}
-                            blurAmount={0.1}
-                            saturation={130}
-                            aberrationIntensity={2}
-                            elasticity={0.3}
-                            cornerRadius={20}
-                            padding="10px 16px"
-                            className="cursor-default"
-                            style={{ display: 'inline-block' }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <Rocket size={18} className="text-indigo-400" />
-                                <span className="text-white text-sm font-medium">Liquid Glass Enabled</span>
-                            </div>
-                        </LiquidGlass>
+                        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-2xl bg-white/5 border border-white/10 shadow-[0_0_20px_rgba(99,102,241,0.15)]">
+                            <Rocket size={18} className="text-indigo-400" />
+                            <span className="text-white text-sm font-medium">Liquid Glass Style</span>
+                        </div>
                     </div>
                     {releases.map((release, idx) => (
                         <div key={idx} className="relative flex flex-col md:flex-row gap-8 md:gap-0 group">

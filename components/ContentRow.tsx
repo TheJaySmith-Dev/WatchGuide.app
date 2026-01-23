@@ -57,7 +57,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
 
         <div 
           ref={rowRef}
-          className="flex gap-4 overflow-x-auto px-4 md:px-8 ml-6 md:ml-24 py-8 hide-scrollbar scroll-smooth snap-x snap-mandatory"
+          className="flex gap-3 md:gap-4 overflow-x-auto px-4 md:px-8 ml-6 md:ml-24 py-8 hide-scrollbar scroll-smooth snap-x snap-mandatory"
         >
           {displayItems.map((item, index) => (
             <div 
@@ -68,7 +68,7 @@ const ContentRow: React.FC<ContentRowProps> = ({
               } ${
                 isPoster 
                   ? thumbnailSize === 'large' ? 'w-48 md:w-60' : thumbnailSize === 'small' ? 'w-28 md:w-36' : 'w-36 md:w-44'
-                  : thumbnailSize === 'large' ? 'w-80 md:w-96' : thumbnailSize === 'small' ? 'w-48 md:w-60' : 'w-64 md:w-80'
+                  : thumbnailSize === 'large' ? 'w-80 md:w-96' : thumbnailSize === 'small' ? 'w-40 md:w-60' : 'w-64 md:w-80'
               }`}
             >
               <div className={`rounded-xl overflow-hidden shadow-lg border border-white/5 bg-gray-800 ${isPoster ? 'aspect-[2/3]' : 'aspect-video'}`}>

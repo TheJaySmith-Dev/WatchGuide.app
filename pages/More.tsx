@@ -9,6 +9,7 @@ import { mdblistService } from '../services/mdblist';
 import ListsPage from './ListsPage';
 
 import ReleaseNotesPage from './ReleaseNotesPage';
+import ChronIntro from '../components/ChronIntro';
 
 interface MoreProps {
     onPersonClick?: (id: number) => void;
@@ -128,6 +129,8 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
 
     return (
         <div className="min-h-[100dvh] pt-24 px-6 pb-24 md:pl-32 md:pt-24 bg-[#050505]">
+
+            <ChronIntro />
 
             {/* Subscriptions */}
             {/* Removed per user request */}
@@ -342,6 +345,23 @@ const More: React.FC<MoreProps> = ({ onPersonClick, currentRegion, onRegionChang
                         </div>
                         <ChevronRight size={16} className="text-gray-400" />
                     </a>
+                    <button
+                        onClick={() => {
+                            localStorage.removeItem('has_seen_onboarding_v1');
+                            localStorage.removeItem('has_seen_chron_intro');
+                            window.dispatchEvent(new Event('restartOnboarding'));
+                            window.dispatchEvent(new Event('restartChronIntro'));
+                            alert('Onboarding and Chron introduction have been restarted.');
+                        }}
+                        className="w-full flex items-center justify-between p-4 border-t border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                    >
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-pink-500/20 rounded-lg text-pink-400">
+                                <RefreshCw size={20} />
+                            </div>
+                            <span className="text-white">Restart Onboarding & Chron Intro</span>
+                        </div>
+                    </button>
                 </div>
             </div>
 

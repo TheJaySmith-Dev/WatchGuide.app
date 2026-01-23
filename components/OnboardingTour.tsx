@@ -23,8 +23,8 @@ const steps: OnboardingStep[] = [
         color: "from-purple-500 to-indigo-500"
     },
     {
-        title: "Meet GuideAI",
-        description: "Your personal movie expert. Ask for recommendations based on your mood, find similar movies, or get detailed info about any title. Powered by advanced AI.",
+        title: "Meet Chron",
+        description: "Your personal movie expert. Ask for recommendations based on your mood, find similar movies, or get detailed info about any title. Chron is built into WatchGuide.",
         icon: BrainCircuit,
         color: "from-pink-500 to-rose-500"
     },

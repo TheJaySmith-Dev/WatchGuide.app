@@ -1,8 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, ChevronDown, ExternalLink, Loader2, ArrowLeft } from 'lucide-react';
-import { ChatMessage } from '../types';
+import { ChatMessage, MediaItem } from '../types';
 import { sendMessageToPoe } from '../services/poe';
 import { storageService } from '../services/storage';
+import ChronIntro from '../components/ChronIntro';
+import YouTube from 'react-youtube';
+import { searchMulti, getVideos } from '../services/api';
 
 interface ProcessedMessage {
     textParts: (string | { type: 'citation'; id: number; url: string; title: string })[];
@@ -54,6 +57,9 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         if (saved === 'grok-4-fast-reasoning' || saved === 'grok-4.1-fast-reasoning') {
             return 'gpt-4o-mini-search';
         }
+        if (saved === 'auto') {
+            return 'gemini-2.5-flash-lite';
+        }
         return saved;
     });
     const [webSearch, setWebSearch] = useState<boolean>(() => {
@@ -64,6 +70,8 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
     const [activePopupIndex, setActivePopupIndex] = useState<number | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const popupRef = useRef<HTMLDivElement>(null);
+    // Removed suggestions UI
+    const [trailerMessages, setTrailerMessages] = useState<Record<number, { key: string; title: string }>>({});
 
     useEffect(() => {
         if (messagesEndRef.current) {
@@ -81,21 +89,45 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
             document.removeEventListener("mousedown", handleClickOutside);
         };
     }, []);
+    // Removed likes-based recommendations fetch
 
-    const chooseModelAndWebSearch = (query: string): { model: string; web: boolean } => {
+    // Removed auto model selection helper
+    // Removed assistant parsing for suggestions
+    const processAssistant = async (_text: string) => {};
+
+    const wantsTrailer = (query: string) => {
         const q = query.toLowerCase();
-        const needsWeb =
-            /\b(latest|today|tonight|news|update|released|release date|box office|ratings|reviews|where to watch|streaming|available on|imdb|rotten|metacritic|official trailer|watch online|link|source|cite|reference|top|trending|rank)\b/.test(q);
-        const isLocalReco =
-            /\b(recommend|suggest|similar to|like|based on my likes|for me|personalized|find movies like|what should i watch)\b/.test(q);
-        if (needsWeb) {
-            return { model: 'gpt-4o-mini-search', web: true };
-        }
-        if (isLocalReco) {
-            return { model: 'gemini-2.5-flash-lite', web: false };
-        }
-        // Default: respect current webSearch toggle; prefer search model if enabled
-        return webSearch ? { model: 'gpt-4o-mini-search', web: true } : { model: 'gemini-2.5-flash-lite', web: false };
+        return /\b(trailer|teaser|play trailer|watch trailer)\b/.test(q);
+    };
+    const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9\s]/g, '').replace(/\s+/g, ' ').trim();
+    const parseTrailerQuery = (query: string): { title: string | null } => {
+        const quoted = query.match(/"([^"]+)"/);
+        if (quoted && quoted[1]) return { title: quoted[1].trim() };
+        const p1 = query.match(/trailer\s+for\s+(.+)/i);
+        if (p1 && p1[1]) return { title: p1[1].trim() };
+        const p2 = query.match(/(watch|play)\s+(the\s+)?trailer\s+for\s+(.+)/i);
+        if (p2 && p2[3]) return { title: p2[3].trim() };
+        const p3 = query.match(/(.+)\s+trailer/i);
+        if (p3 && p3[1]) return { title: p3[1].trim() };
+        return { title: null };
+    };
+    const pickItem = (items: MediaItem[], q: string): MediaItem | undefined => {
+        const nq = normalize(q);
+        const exact = items.find(i => normalize(i.title || i.name || '') === nq);
+        if (exact) return exact;
+        const partial = items.find(i => normalize(i.title || i.name || '').includes(nq));
+        if (partial) return partial;
+        return items.find(r => r.media_type === 'movie' || r.media_type === 'tv');
+    };
+    const pickVideo = (videos: any[]) => {
+        const yt = videos.filter(v => v.site === 'YouTube');
+        const official = yt.find(v => (v.type || '').toLowerCase() === 'trailer' && (v.official === true || /official/i.test(v.name || '')));
+        if (official) return official;
+        const trailer = yt.find(v => (v.type || '').toLowerCase() === 'trailer');
+        if (trailer) return trailer;
+        const teaser = yt.find(v => (v.type || '').toLowerCase() === 'teaser');
+        if (teaser) return teaser;
+        return yt[0];
     };
 
     const handleSendMessage = async () => {
@@ -112,12 +144,25 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
         setInputValue('');
         setIsLoading(true);
         try {
+            let trailerInfo: { key: string; title: string } | null = null;
+            if (wantsTrailer(userMessage.content)) {
+                const parsed = parseTrailerQuery(userMessage.content);
+                const qTitle = parsed.title || userMessage.content.replace(/\b(trailer|teaser|play|watch|for|the)\b/gi, '').trim();
+                const results = await searchMulti(qTitle);
+                const item = pickItem(results, qTitle);
+                if (item) {
+                    const type = item.media_type === 'tv' ? 'tv' : 'movie';
+                    const vids = await getVideos(type, item.id);
+                    const best = pickVideo(vids);
+                    if (best && best.key) trailerInfo = { key: best.key, title: item.title || item.name || 'Trailer' };
+                }
+            }
             const likedItems = await storageService.getList('liked');
             const likedContext = likedItems.length > 0
                 ? `\n\nUser's Liked Movies/Shows (for algorithm): ${likedItems.map(i => i.title || i.name).join(', ')}`
                 : '';
 
-            const auto = model === 'auto' ? chooseModelAndWebSearch(userMessage.content) : { model, web: webSearch };
+            const auto = { model, web: webSearch };
             const responseContent = await sendMessageToPoe(
                 [...messages, userMessage],
                 likedContext + "\n\nCRITICAL: The Simkl integration has been COMPLETELY REMOVED. THE APP NOW USES PRIVACY-FIRST LOCAL STORAGE ONLY. Do NOT mention Simkl, accounts, or logging in. If the user asks to add to a list, tell them to use the '+' (Want to Watch), 'Check' (Watched), or 'Heart' (Like) buttons in the detail view. Use the user's Liked items to personalize recommendations based on their local preferences.",
@@ -133,7 +178,14 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                 timestamp: Date.now(),
             };
 
-            setMessages(prev => [...prev, aiMessage]);
+            setMessages(prev => {
+                const next = [...prev, aiMessage];
+                if (trailerInfo) {
+                    setTrailerMessages(t => ({ ...t, [next.length - 1]: trailerInfo! }));
+                }
+                return next;
+            });
+            await processAssistant(displayContent);
         } catch (error) {
             console.error('Failed to get response:', error);
         } finally {
@@ -160,7 +212,8 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
 
     return (
         <div className="min-h-[100dvh] pt-24 pb-24 px-4 md:pl-32 bg-[#050505] flex flex-col max-w-5xl mx-auto h-[100dvh] relative">
-            
+            <ChronIntro />
+            {/* Suggestions UI removed for cleaner chat */}
             {/* Header with Back Button */}
             <div className="absolute top-24 left-4 md:left-32 z-10">
                  <button onClick={onBack} className="p-2 hover:bg-white/10 rounded-full transition-colors text-white">
@@ -194,28 +247,25 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                                 }}
                                 className="bg-white/10 text-white text-sm px-3 py-2 rounded-lg border border-white/10"
                             >
-                                <option value="auto">Auto (Best)</option>
                                 <option value="gemini-2.5-flash-lite">Gemini Flash Lite</option>
                                 <option value="gpt-4o-mini-search">GPT-4o-mini-Search</option>
                             </select>
-                            {model !== 'auto' && (
-                                <>
-                                    <label className="text-xs text-white/40 ml-4 mr-2">Web Search</label>
+                            <>
+                                <label className="text-xs text-white/40 ml-4 mr-2">Web Search</label>
+                                <div
+                                    className={`w-12 h-6 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
+                                    onClick={() => {
+                                        const val = !webSearch;
+                                        setWebSearch(val);
+                                        localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
+                                    }}
+                                    title="Web Search"
+                                >
                                     <div
-                                        className={`w-12 h-6 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
-                                        onClick={() => {
-                                            const val = !webSearch;
-                                            setWebSearch(val);
-                                            localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
-                                        }}
-                                        title="Web Search"
-                                    >
-                                        <div
-                                            className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-6' : 'translate-x-0'}`}
-                                        />
-                                    </div>
-                                </>
-                            )}
+                                        className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-6' : 'translate-x-0'}`}
+                                    />
+                                </div>
+                            </>
                         </div>
                     </div>
                 ) : (
@@ -247,6 +297,16 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                                         </div>
                                     )}
 
+                                    {msg.role === 'assistant' && trailerMessages[idx] && (
+                                        <div className="mt-3 w-full max-w-[85%]">
+                                            <div className="bg-white/5 border border-white/10 rounded-2xl p-3 shadow-xl">
+                                                <div className="text-white font-semibold mb-2">{trailerMessages[idx].title}</div>
+                                                <div className="aspect-video rounded-xl overflow-hidden">
+                                                    <YouTube videoId={trailerMessages[idx].key} opts={{ playerVars: { autoplay: 0 } }} />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
                                     {links.length > 0 && (
                                         <div className="mt-2 text-xs">
                                             <div
@@ -333,7 +393,7 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                         className="w-full bg-white/5 text-white placeholder-white/30 rounded-xl pl-6 pr-14 py-4 text-base focus:outline-none focus:ring-1 focus:ring-indigo-500/50 border border-white/10 transition-all shadow-lg"
                         autoFocus
                     />
-                    <div className="absolute right-40 flex items-center gap-2 hidden md:flex">
+                    <div className="absolute right-16 flex items-center gap-2 hidden md:flex">
                         <select
                             value={model}
                             onChange={(e) => {
@@ -344,28 +404,25 @@ const GuideAIPage: React.FC<GuideAIPageProps> = ({ onBack }) => {
                             className="bg-white/10 text-white text-xs px-2 py-2 rounded-lg border border-white/10"
                             title="AI Model"
                         >
-                            <option value="auto">Auto (Best)</option>
                             <option value="gemini-2.5-flash-lite">Gemini Flash Lite</option>
                             <option value="gpt-4o-mini-search">GPT-4o-mini-Search</option>
                         </select>
-                        {model !== 'auto' && (
-                            <>
-                                <label className="text-white/40 text-[11px]">Web</label>
+                        <>
+                            <label className="text-white/40 text-[11px]">Web</label>
+                            <div
+                                className={`w-10 h-5 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
+                                onClick={() => {
+                                    const val = !webSearch;
+                                    setWebSearch(val);
+                                    localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
+                                }}
+                                title="Web Search"
+                            >
                                 <div
-                                    className={`w-10 h-5 rounded-full border border-white/10 relative cursor-pointer ${webSearch ? 'bg-indigo-600/60' : 'bg-white/10'}`}
-                                    onClick={() => {
-                                        const val = !webSearch;
-                                        setWebSearch(val);
-                                        localStorage.setItem('guideai_web_search', val ? 'true' : 'false');
-                                    }}
-                                    title="Web Search"
-                                >
-                                    <div
-                                        className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-5' : 'translate-x-0'}`}
-                                    />
-                                </div>
-                            </>
-                        )}
+                                    className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform ${webSearch ? 'translate-x-5' : 'translate-x-0'}`}
+                                />
+                            </div>
+                        </>
                     </div>
                     <button
                         onClick={handleSendMessage}

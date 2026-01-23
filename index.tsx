@@ -65,8 +65,6 @@ const Router: React.FC = () => {
   }, []);
 
   switch (path) {
-    case '/pricing':
-      return <Pricing />;
     case '/tos':
     case '/terms':
       return <TermsOfService />;

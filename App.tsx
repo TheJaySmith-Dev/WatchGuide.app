@@ -63,6 +63,14 @@ const App: React.FC = () => {
     }
   }, []);
 
+  useEffect(() => {
+    const restartHandler = () => {
+      setShowOnboarding(true);
+    };
+    window.addEventListener('restartOnboarding', restartHandler as EventListener);
+    return () => window.removeEventListener('restartOnboarding', restartHandler as EventListener);
+  }, []);
+
   const handleTabChange = (tab: string) => {
     window.location.hash = `#/${tab}`;
     setActiveTab(tab);
